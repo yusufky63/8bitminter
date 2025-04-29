@@ -4,20 +4,25 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --foreground: #121212;
+  --card-background: #ffffff;
+  --card-foreground: #121212;
+  --primary: #7C65C1;
+  --primary-light: #9F91D0;
+  --primary-dark: #6952A3;
+  --accent: #FFA020;
+  --gray-light: #F7F7F7;
+  --gray-mid: #E0E0E0;
+  --gray-dark: #757575;
+  --success: #4CAF50;
+  --error: #EF476F;
+  --radius: 0.75rem;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: 'Inter', Helvetica, Arial, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 * {
@@ -33,4 +38,87 @@ body {
   :root {
     --radius: 0.5rem;
   }
+}
+
+@layer components {
+  .card {
+    @apply p-5 rounded-xl shadow-sm border border-gray-mid;
+    background-color: #ffffff;
+    color: var(--foreground);
+  }
+  
+  .container-sm {
+    @apply w-full max-w-md mx-auto px-4;
+  }
+  
+  .input-field {
+    @apply rounded-lg border border-gray-mid px-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent;
+    background-color: #ffffff;
+    color: var(--foreground);
+  }
+  
+  .btn-primary {
+    @apply bg-primary hover:bg-primary-dark text-white font-medium py-3 px-6 rounded-lg transition-colors;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-light font-medium py-3 px-6 rounded-lg transition-colors;
+    color: var(--foreground);
+  }
+  
+  .section {
+    @apply py-4;
+  }
+
+  /* Get Started section */
+  .get-started {
+    @apply mb-8 p-6 rounded-xl bg-white border border-gray-mid;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+  
+  .get-started-step {
+    @apply flex items-start pb-4 mb-4 border-b border-gray-mid;
+  }
+  
+  .get-started-step:last-child {
+    @apply border-0 mb-0 pb-0;
+  }
+}
+
+/* Step number - fix for Tailwind compilation */
+.step-number {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  background-color: rgba(124, 101, 193, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 0.75rem;
+  font-weight: 500;
+  color: var(--primary);
+}
+
+/* Minimal progress steps */
+.step-indicator {
+  @apply flex items-center gap-1.5 mb-6;
+}
+
+.step-dot {
+  @apply w-2.5 h-2.5 rounded-full bg-gray-mid;
+  transition: all 0.3s ease;
+}
+
+.step-dot.active {
+  @apply bg-primary w-4 h-4;
+}
+
+/* Modern animation utilities */
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }

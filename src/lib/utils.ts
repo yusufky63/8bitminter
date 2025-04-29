@@ -103,13 +103,13 @@ export async function getFarcasterMetadata(): Promise<FrameMetadata> {
     accountAssociation,
     frame: {
       version: "1",
-      name: process.env.NEXT_PUBLIC_FRAME_NAME || "Frames v2 Demo",
+      name: process.env.NEXT_PUBLIC_FRAME_NAME || "VisionZ Coin Creator",
       iconUrl: `${appUrl}/icon.png`,
       homeUrl: appUrl,
       imageUrl: `${appUrl}/opengraph-image`,
-      buttonTitle: process.env.NEXT_PUBLIC_FRAME_BUTTON_TEXT || "Launch Frame",
+      buttonTitle: process.env.NEXT_PUBLIC_FRAME_BUTTON_TEXT || "Create Coin",
       splashImageUrl: `${appUrl}/splash.png`,
-      splashBackgroundColor: "#f7f7f7",
+      splashBackgroundColor: "#1E40AF", // Deeper blue color for brand identity
       webhookUrl,
     },
   };

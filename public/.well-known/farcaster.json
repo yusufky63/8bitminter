@@ -1,0 +1,18 @@
+{
+  "accountAssociation": {
+    "header": "PLACEHOLDER_HEADER",
+    "payload": "PLACEHOLDER_PAYLOAD",
+    "signature": "PLACEHOLDER_SIGNATURE"
+  },
+  "frame": {
+    "version": "1",
+    "name": "VisionZ Coin Creator",
+    "iconUrl": "https://visionz-mini.vercel.app/icon.png",
+    "homeUrl": "https://visionz-mini.vercel.app/",
+    "imageUrl": "https://visionz-mini.vercel.app/opengraph-image",
+    "buttonTitle": "Create Coin",
+    "splashImageUrl": "https://visionz-mini.vercel.app/splash.png",
+    "splashBackgroundColor": "#7C65C1",
+    "webhookUrl": "https://visionz-mini.vercel.app/api/webhook"
+  }
+} 
