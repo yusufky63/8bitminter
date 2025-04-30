@@ -9,6 +9,7 @@ const LoadingComponent = () => (
     <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
   </div>
 );
+LoadingComponent.displayName = 'LoadingComponent';
 
 // Özel NoSSR wrapper bileşeni
 function NoSSR({ children }: { children: React.ReactNode }) {
@@ -18,6 +19,7 @@ function NoSSR({ children }: { children: React.ReactNode }) {
     </div>
   )
 }
+NoSSR.displayName = 'NoSSR';
 
 // Farcaster Frame SDK'yı kullanan bileşenler için daha iyi dinamik import yaklaşımı
 const CoinCreator = dynamic(
@@ -28,21 +30,23 @@ const CoinCreator = dynamic(
       // En iyi dynamicImport yaklaşımı
       return import("~/components/CoinCreator").catch(err => {
         console.error("[APP] Error dynamically importing CoinCreator:", err);
-        return () => <div>Failed to load CoinCreator component</div>;
+        const FallbackComponent = () => <div>Failed to load CoinCreator component</div>;
+        FallbackComponent.displayName = 'CoinCreatorFallback';
+        return FallbackComponent;
       });
     }
     // Sunucu tarafında boş bir bileşen döndür
-    return Promise.resolve(() => null);
+    const EmptyComponent = () => null;
+    EmptyComponent.displayName = 'EmptyCoinCreator';
+    return Promise.resolve(EmptyComponent);
   },
   {
-    ssr: false,
+  ssr: false,
     loading: () => <LoadingComponent />
   }
 );
 
-export default function App(
-  { title }: { title?: string } = { title: process.env.NEXT_PUBLIC_FRAME_NAME || "VisionZ Coin Creator" }
-) {
+export default function App() {
   return (
     <NoSSR>
       <Suspense fallback={<LoadingComponent />}>

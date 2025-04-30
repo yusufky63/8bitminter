@@ -31,6 +31,17 @@ interface FrameContext {
   };
 }
 
+// SDK instance tipini tanımlayalım
+interface SDKInstance {
+  context: FrameContext;
+  actions: {
+    ready: (options?: object) => Promise<void>;
+    addFrame: () => Promise<{ notificationDetails?: FrameNotificationDetails }>;
+  };
+  on: (event: string, callback: (data: Record<string, unknown>) => void) => void;
+  removeAllListeners: () => void;
+}
+
 class SDKError extends Error {
   constructor(message: string) {
     super(message);
@@ -55,7 +66,7 @@ const FrameContext = React.createContext<FrameContextType | undefined>(undefined
 
 export function useFrame() {
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
-  const [sdkInstance, setSdkInstance] = useState<any>(null);
+  const [sdkInstance, setSdkInstance] = useState<SDKInstance | null>(null);
   const [context, setContext] = useState<FrameContext>();
   const [added, setAdded] = useState(false);
   const [notificationDetails, setNotificationDetails] = useState<FrameNotificationDetails | null>(null);
@@ -99,7 +110,7 @@ export function useFrame() {
       try {
         // SDK'yı dinamik olarak import et
         const { sdk } = await import('@farcaster/frame-sdk');
-        setSdkInstance(sdk);
+        setSdkInstance(sdk as SDKInstance);
         
         // Context'i al
         try {
@@ -174,7 +185,7 @@ export function useFrame() {
         sdkInstance.removeAllListeners();
       }
     };
-  }, [isSDKLoaded]);
+  }, [isSDKLoaded, sdkInstance]);
 
   return { isSDKLoaded, context, added, notificationDetails, lastEvent, addFrame, addFrameResult };
 }

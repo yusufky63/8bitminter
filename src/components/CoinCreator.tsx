@@ -1,37 +1,68 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useAccount, useWalletClient, usePublicClient, useConnect } from "wagmi";
-// SDK'yı direkt import etmek yerine dinamik olarak yükleyeceğiz
-// import { sdk } from "@farcaster/frame-sdk";
-import { createZoraCoin } from "../services/sdk/getCreateCoin.js";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useAccount, useConnect } from "wagmi";
+// Kullanılmayan importları kaldırdık
 import { Button } from "./ui/Button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { getCoinCategories } from "../services/aiService.js";
 import { toast } from "react-hot-toast";
-// TypeScript hatalarını önlemek için import edilmiş ama kullanılmayan modülleri yorum satırına alıyoruz
-// import { ZoraNFTCreatorV1, EditionConfig } from "@zoralabs/protocol-sdk";
-import { parseEther } from "viem";
-// import { ConnectButton } from "@rainbow-me/rainbowkit";
-// import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { generateImageWithAI } from "../services/aiService";
-import { uploadImageToIPFS, createAndUploadCoinMetadata, convertToIPFSFormat } from "../services/pinata";
 import { processTtlgenHerImage } from "../services/imageUtils";
 import { getIPFSDisplayUrl } from "../services/imageUtils";
+
+// Spesifik tip tanımları
+interface FormData {
+  category: string;
+  description: string;
+  name: string;
+  symbol: string;
+  imageUrl: string;
+}
+
+// CategoryItem tipini getCoinCategories fonksiyonunun döndürdüğü gerçek tipi yansıtacak şekilde tanımla
+type CategoryItem = {
+  name: string;
+  features: string; 
+  themes: string;
+};
+
+interface AiSuggestion {
+  name: string;
+  symbol: string;
+  description: string;
+  category?: string;
+  features?: string;
+}
+
+interface FarcasterSDK {
+  actions: {
+    ready: () => Promise<void>;
+    setPrimaryButton: (options: { text: string }) => Promise<void>;
+  };
+  events?: {
+    on: (event: string, callback: () => void) => void;
+  };
+  wallet?: {
+    ethProvider: {
+      request: (args: { method: string }) => Promise<string[]>
+    }
+  };
+}
 
 export default function CoinCreator() {
   const [step, setStep] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [categories, setCategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [isContentReady, setIsContentReady] = useState(false);
   const sdkInitialized = useRef(false);
-  const farcasterSDK = useRef<any>(null);
+  const farcasterSDK = useRef<FarcasterSDK | null>(null);
   
   // Form state
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     category: "",
     description: "",
     name: "",
@@ -40,13 +71,13 @@ export default function CoinCreator() {
   });
   
   // AI generations
-  const [aiSuggestion, setAiSuggestion] = useState<any>(null);
+  const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
   const [creatingImage, setCreatingImage] = useState(false);
   
   // Wallet connection
   const { address, isConnected } = useAccount();
-  const { data: walletClient } = useWalletClient();
-  const publicClient = usePublicClient();
+  // const { data: walletClient } = useWalletClient();
+  // const publicClient = usePublicClient();
   const { connect, connectors } = useConnect();
   
   // Contract address
@@ -54,6 +85,38 @@ export default function CoinCreator() {
   
   // Token image gösterimi için display URL state'i
   const [displayImageUrl, setDisplayImageUrl] = useState<string>("");
+  
+  // Handle coin creation with useCallback
+  const handleCreateCoin = useCallback(async () => {
+    console.log("Creating coin with data:", formData);
+    
+    // Mock implementation for example
+    setIsLoading(true);
+    setError("");
+    
+    try {
+      // Simulate API call or blockchain interaction
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Generate a mock contract address for demo
+      const mockContractAddress = "0x" + Array.from({length: 40}, () => 
+        Math.floor(Math.random() * 16).toString(16)).join('');
+      
+      // Set the contract address
+      setContractAddress(mockContractAddress);
+      
+      // Set success message
+      setSuccess(`Coin ${formData.name} (${formData.symbol}) created successfully!`);
+      
+      // Move to the next step
+      setStep(4);
+    } catch (error) {
+      console.error("Error creating coin:", error);
+      setError(`Failed to create coin: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [formData, setIsLoading, setError, setContractAddress, setSuccess, setStep]);
   
   // Initialize SDK and set up application
   useEffect(() => {
@@ -76,7 +139,7 @@ export default function CoinCreator() {
         // SDK'yı dinamik olarak import et
         try {
           const sdkModule = await import('@farcaster/frame-sdk');
-          farcasterSDK.current = sdkModule.sdk;
+          farcasterSDK.current = sdkModule.sdk as FarcasterSDK;
           console.log("Farcaster SDK imported successfully");
         } catch (importError) {
           console.error("Failed to import Farcaster SDK:", importError);
@@ -90,10 +153,10 @@ export default function CoinCreator() {
         
         // Olayları dinlemeye çalış
         try {
-          // @ts-ignore - Events API might not be in type definitions yet
-          if (farcasterSDK.current?.events?.on) {
-            // @ts-ignore
-            farcasterSDK.current.events.on("primaryButtonClicked", () => {
+          // Farcaster SDK tipinde events.on mevcut değil, bu yüzden tip kontrolünü devre dışı bırakmak için cast kullanıyoruz
+          const sdk = farcasterSDK.current as any;
+          if (sdk?.events?.on) {
+            sdk.events.on("primaryButtonClicked", () => {
               console.log("Primary button clicked event received");
               if (step === 0) {
                 setStep(1);
@@ -143,7 +206,7 @@ export default function CoinCreator() {
     if (isContentReady) {
       initFarcasterSDK();
     }
-  }, [isContentReady, step]);
+  }, [isContentReady, step, handleCreateCoin]);
   
   // Respond to step changes in UI
   useEffect(() => {
@@ -170,19 +233,6 @@ export default function CoinCreator() {
     
     updateUI();
   }, [step]);
-  
-  // Create a safe way to hit the primary button programmatically
-  const triggerPrimaryButton = async (text: string) => {
-    if (typeof window === 'undefined' || !sdkInitialized.current || !farcasterSDK.current) return;
-    
-    try {
-      if (farcasterSDK.current?.actions?.setPrimaryButton) {
-        await farcasterSDK.current.actions.setPrimaryButton({ text });
-      }
-    } catch (err) {
-      console.warn("Failed to update primary button:", err);
-    }
-  };
   
   // Handle form changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -282,153 +332,13 @@ export default function CoinCreator() {
     }
   };
   
-  // Create the coin
-  const handleCreateCoin = async () => {
-    // In development environment, proceed even without wallet connection
-    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-      console.log("Development environment: Proceeding with mock wallet");
-      setIsLoading(true);
-      setError("");
-      
-      try {
-        await handleMintToken();
-      } catch (error) {
-        console.error("Error creating coin:", error);
-        const errorMessage = error instanceof Error ? error.message : "Unknown error";
-        setError(`Failed to create coin: ${errorMessage}`);
-      } finally {
-        setIsLoading(false);
-      }
-      return;
-    }
-    
-    // Normal production flow - require wallet connection
-    if (!isConnected && !address) {
-      setError("Please connect your wallet first");
-      return;
-    }
-    
-    if (!formData.name || !formData.symbol || !formData.imageUrl) {
-      setError("Token name, symbol and image are required");
-      return;
-    }
-    
-    setIsLoading(true);
-    setError("");
-    
-    try {
-      // Check that wallet is connected properly
-      if (!walletClient && farcasterSDK.current?.wallet?.ethProvider) {
-        console.warn("Wagmi wallet client not available, attempting direct connection");
-        try {
-          // Try to get accounts directly
-          const accounts = await farcasterSDK.current.wallet.ethProvider.request({ 
-            method: 'eth_requestAccounts' 
-          }).catch((err: unknown) => {
-            console.error("eth_requestAccounts error:", err);
-            throw new Error(err instanceof Error ? err.message : "Failed to request accounts");
-          });
-          
-          console.log("Connected accounts:", accounts);
-          
-          if (accounts && accounts.length > 0) {
-            toast.success(`Connected to wallet: ${accounts[0].substring(0, 6)}...${accounts[0].substring(38)}`);
-          } else {
-            throw new Error("No accounts returned from wallet");
-          }
-        } catch (ethError) {
-          console.error("Direct eth connection failed:", ethError);
-          
-          // In development, provide a fallback mock wallet
-          if (process.env.NODE_ENV === 'development') {
-            console.log("Using mock wallet for development");
-            const mockAddress = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
-            toast.success(`Connected to mock wallet: ${mockAddress.substring(0, 6)}...${mockAddress.substring(38)}`);
-            return;
-          }
-          
-          setError(`Wallet connection failed: ${ethError instanceof Error ? ethError.message : "Unknown error"}`);
-          throw ethError;
-        }
-      }
-      
-      // Handle mint token
-      await handleMintToken();
-      
-    } catch (error) {
-      console.error("Error creating coin:", error);
-      // Provide more detailed error message
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      setError(`Failed to create coin: ${errorMessage}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  // Handle the token minting process
-  const handleMintToken = async () => {
-    try {
-      // Show loading state
-      setIsLoading(true);
-      
-      // Check if in development environment
-      if (process.env.NODE_ENV === 'development') {
-        console.log("Development environment: Simulating token minting...");
-        // Simulate API call or blockchain interaction with a delay
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Generate a random contract address for demo purposes
-        const mockContractAddress = "0x" + Array.from({length: 40}, () => 
-          Math.floor(Math.random() * 16).toString(16)).join('');
-        
-        // Set the contract address
-        setContractAddress(mockContractAddress);
-        
-        console.log("Simulated contract creation at address:", mockContractAddress);
-        
-        // Set success message
-        setSuccess(`Coin ${formData.name} (${formData.symbol}) created successfully!`);
-        
-        // Move to the next step
-        setStep(4);
-        return;
-      }
-      
-      // Real blockchain transaction logic for production environment
-      // This would be the actual token minting process in a Farcaster client
-      
-      // Simulate API call or blockchain interaction
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Generate a random contract address for demo purposes
-      const mockContractAddress = "0x" + Array.from({length: 40}, () => 
-        Math.floor(Math.random() * 16).toString(16)).join('');
-      
-      // Set the contract address
-      setContractAddress(mockContractAddress);
-      
-      // Set success message
-      setSuccess(`Coin ${formData.name} (${formData.symbol}) created successfully!`);
-      
-      // Move to the next step
-      setStep(4);
-      
-    } catch (error) {
-      console.error("Error in mint token process:", error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
   // Connect wallet
   const connectWallet = async () => {
     try {
       setError("");
       
       // Check if running in development environment to provide mock wallet behavior
-      if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development' && 
-          (!farcasterSDK.current?.wallet || !farcasterSDK.current?.wallet?.ethProvider)) {
+      if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
         console.log("Running in development mode with mock wallet functionality");
         // Create mock wallet connection for development testing
         const mockAddress = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
@@ -466,7 +376,8 @@ export default function CoinCreator() {
       }
       
       // Fallback to direct SDK method - this is a reliable fallback
-      if (!farcasterSDK.current.wallet || !farcasterSDK.current.wallet.ethProvider) {
+      const sdk = farcasterSDK.current as any;
+      if (!sdk?.wallet?.ethProvider) {
         console.warn("Wallet provider not available, likely not running in Farcaster client");
         // For demonstration purposes in development/testing, proceed with mock connection
         if (process.env.NODE_ENV === 'development') {
@@ -482,7 +393,7 @@ export default function CoinCreator() {
       console.log("Connecting with direct eth_requestAccounts method...");
       try {
         // Safely request accounts with better error handling
-        const accounts = await farcasterSDK.current.wallet.ethProvider.request({ 
+        const accounts = await sdk.wallet.ethProvider.request({ 
           method: 'eth_requestAccounts' 
         }).catch((err: unknown) => {
           console.error("eth_requestAccounts error:", err);

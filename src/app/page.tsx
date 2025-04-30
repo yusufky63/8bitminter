@@ -6,7 +6,6 @@ const appUrl = process.env.NEXT_PUBLIC_URL || "https://visionz-mini.vercel.app";
 // frame preview metadata
 const appName = process.env.NEXT_PUBLIC_FRAME_NAME || "VisionZ Coin Creator";
 const splashImageUrl = `${appUrl}/splash.png`;
-const iconUrl = `${appUrl}/icon.png`;
 const appDescription = process.env.NEXT_PUBLIC_FRAME_DESCRIPTION || "Create AI-powered Zora coins with Farcaster";
 const buttonText = process.env.NEXT_PUBLIC_FRAME_BUTTON_TEXT || "Create Coin";
 

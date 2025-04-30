@@ -3,7 +3,9 @@
  * @module sdk/getProfiles
  */
 
-import { getProfile, getProfileBalances, getCoinDetails, setApiKey } from "@zoralabs/coins-sdk";
+import { getProfile, getProfileBalances, setApiKey } from "@zoralabs/coins-sdk";
+// Import getCoinDetails from our local file instead
+import { getCoinDetails } from "./getCoins";
 
 // Import getCoinDetails to use in verifyAddressType function
 setApiKey(process.env.NEXT_PUBLIC_ZORA_API_KEY);
