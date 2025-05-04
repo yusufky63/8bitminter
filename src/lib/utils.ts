@@ -37,76 +37,23 @@ export function getSecretEnvVars() {
 }
 
 export async function getFarcasterMetadata(): Promise<FrameMetadata> {
-  // First check for FRAME_METADATA in .env and use that if it exists
-  if (process.env.FRAME_METADATA) {
-    try {
-      const metadata = JSON.parse(process.env.FRAME_METADATA);
-      console.log('Using pre-signed frame metadata from environment');
-      return metadata;
-    } catch (error) {
-      console.warn('Failed to parse FRAME_METADATA from environment:', error);
-    }
-  }
-
-  const appUrl = process.env.NEXT_PUBLIC_URL;
-  if (!appUrl) {
-    throw new Error('NEXT_PUBLIC_URL not configured');
-  }
-
-  // Get the domain from the URL (without https:// prefix)
-  const domain = new URL(appUrl).hostname;
-  console.log('Using domain for manifest:', domain);
-
-  const secretEnvVars = getSecretEnvVars();
-  if (!secretEnvVars) {
-    console.warn('No seed phrase or FID found in environment variables -- generating unsigned metadata');
-  }
-
-  let accountAssociation;
-  if (secretEnvVars) {
-    // Generate account from seed phrase
-    const account = mnemonicToAccount(secretEnvVars.seedPhrase);
-    const custodyAddress = account.address;
-
-    const header = {
-      fid: parseInt(secretEnvVars.fid),
-      type: 'custody',
-      key: custodyAddress,
-    };
-    const encodedHeader = Buffer.from(JSON.stringify(header), 'utf-8').toString('base64');
-
-    const payload = {
-      domain
-    };
-    const encodedPayload = Buffer.from(JSON.stringify(payload), 'utf-8').toString('base64url');
-
-    const signature = await account.signMessage({ 
-      message: `${encodedHeader}.${encodedPayload}`
-    });
-    const encodedSignature = Buffer.from(signature, 'utf-8').toString('base64url');
-
-    accountAssociation = {
-      header: encodedHeader,
-      payload: encodedPayload,
-      signature: encodedSignature
-    };
-  }
-
-  // Set the webhook URL to the application's API endpoint
-  const webhookUrl = `${appUrl}/api/webhook`;
-
+  // Return the exact same content as the static file
   return {
-    accountAssociation,
+    accountAssociation: {
+      header: "eyJmaWQiOjg2NDc5MywidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweENjZTJFMjI5NzNmMUY1MTA5MjQzQTZiNkREZTdBNDk4QzlENjYzNjYifQ",
+      payload: "eyJkb21haW4iOiJ0YXgtdXN1YWxseS1hdXN0aW4tbGlzdGVuaW5nLnRyeWNsb3VkZmxhcmUuY29tIn0",
+      signature: "MHhjODJhODNhMDhlYzhkMmNmZWJiMjRhNGZlMmUyOWRlNTY5OGU2NjYwYzEyMDA4MzQ4NTQxMmZlNjJlOGJjOGYyNzY0YTg0OWVmMWYxZmI0YjIzYmY2MDcxMzZkYjEzNDdkMWNkMjMyMzVhZTg1ZGJmZDZjODRhMzlhMDhkY2I4NDFj"
+    },
     frame: {
       version: "1",
-      name: process.env.NEXT_PUBLIC_FRAME_NAME || "VisionZ Coin Creator",
-      iconUrl: `${appUrl}/icon.png`,
-      homeUrl: appUrl,
-      imageUrl: `${appUrl}/opengraph-image`,
-      buttonTitle: process.env.NEXT_PUBLIC_FRAME_BUTTON_TEXT || "Create Coin",
-      splashImageUrl: `${appUrl}/splash.png`,
-      splashBackgroundColor: "#1E40AF", // Deeper blue color for brand identity
-      webhookUrl,
+      name: "VisionZ Retro",
+      iconUrl: `${process.env.NEXT_PUBLIC_URL || 'https://visionz-mini.vercel.app'}/logo.png`,
+      imageUrl: `${process.env.NEXT_PUBLIC_URL || 'https://visionz-mini.vercel.app'}/opengraph-image.png`,
+      buttonTitle: "Create Vision",
+      homeUrl: process.env.NEXT_PUBLIC_URL || 'https://visionz-mini.vercel.app',
+      splashImageUrl: `${process.env.NEXT_PUBLIC_URL || 'https://visionz-mini.vercel.app'}/logo.png`,
+      splashBackgroundColor: "#000000",
+      webhookUrl: `${process.env.NEXT_PUBLIC_URL || 'https://visionz-mini.vercel.app'}/api/webhook`
     },
   };
 }
