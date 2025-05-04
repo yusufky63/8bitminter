@@ -1,1 +1,9 @@
-null
+{
+  "frame": {
+    "version": "1",
+    "name": "VisionZ Retro",
+    "imageUrl": "https://visionz-mini.vercel.app/opengraph-image",
+    "buttonTitle": "Create Vision",
+    "homeUrl": "https://visionz-mini.vercel.app"
+  }
+}
