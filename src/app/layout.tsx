@@ -4,6 +4,21 @@ import "@fontsource/vt323";
 import Providers from "./providers";
 import type { Metadata } from "next";
 
+const frameMetadata = {
+  version: "vNext",
+  image: {
+    src: "/opengraph-image.png",
+    width: 1200,
+    height: 630
+  },
+  buttons: [
+    {
+      label: "Create Vision"
+    }
+  ],
+  postUrl: process.env.NEXT_PUBLIC_URL || 'https://visionz-mini.vercel.app/api/frame'
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_URL || 'https://visionz-mini.vercel.app'),
   title: "VisionZ Retro",

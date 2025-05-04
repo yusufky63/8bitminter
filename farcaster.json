@@ -1,9 +1,17 @@
 {
+  "accountAssociation": {
+    "header": "eyJmaWQiOjg2NDc5MywidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweENjZTJFMjI5NzNmMUY1MTA5MjQzQTZiNkREZTdBNDk4QzlENjYzNjYifQ",
+    "payload": "eyJkb21haW4iOiJ0YXgtdXN1YWxseS1hdXN0aW4tbGlzdGVuaW5nLnRyeWNsb3VkZmxhcmUuY29tIn0",
+    "signature": "MHhjODJhODNhMDhlYzhkMmNmZWJiMjRhNGZlMmUyOWRlNTY5OGU2NjYwYzEyMDA4MzQ4NTQxMmZlNjJlOGJjOGYyNzY0YTg0OWVmMWYxZmI0YjIzYmY2MDcxMzZkYjEzNDdkMWNkMjMyMzVhZTg1ZGJmZDZjODRhMzlhMDhkY2I4NDFj"
+  },
   "frame": {
     "version": "1",
     "name": "VisionZ Retro",
-    "imageUrl": "https://visionz-mini.vercel.app/opengraph-image",
+    "imageUrl": "https://visionz-mini.vercel.app/opengraph-image.png",
     "buttonTitle": "Create Vision",
-    "homeUrl": "https://visionz-mini.vercel.app"
+    "homeUrl": "https://visionz-mini.vercel.app",
+    "splashImageUrl": "https://visionz-mini.vercel.app/logo.png",
+    "splashBackgroundColor": "#000000",
+    "webhookUrl": "https://visionz-mini.vercel.app/api/webhook"
   }
 }
