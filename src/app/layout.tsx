@@ -1,32 +1,33 @@
+import "./globals.css";
+import "@fontsource/press-start-2p";
+import "@fontsource/vt323";
+import Providers from "./providers";
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import { getSession } from "~/auth"
-import "~/app/globals.css";
-import { Providers } from "~/app/providers";
-
-// Load Inter font
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-inter",
-});
 
 export const metadata: Metadata = {
-  title: process.env.NEXT_PUBLIC_FRAME_NAME || "VisionZ Coin Creator",
-  description: process.env.NEXT_PUBLIC_FRAME_DESCRIPTION || "Create AI-powered Zora coins with Farcaster",
+  title: "VisionZ Coin Maker",
+  description: "Create RETRO AI-powered tokens on Farcaster",
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {  
-  const session = await getSession()
-
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <html lang="en" className={`${inter.variable}`}>
-      <body className="bg-white text-foreground">
-        <Providers session={session}>{children}</Providers>
+    <html lang="en">
+      <head>
+        <link rel="icon" href="/logo.png" />
+        <meta name="theme-color" content="#6366F1" />
+      </head>
+      <body>
+        <Providers>
+          {children}
+        </Providers>
       </body>
     </html>
   );

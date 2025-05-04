@@ -266,7 +266,7 @@ export const validateTradeBalance = async (
 
     if (tradeType === "buy") {
       const ethBalance = await checkETHBalance(userAddress, publicClient);
-      const gasReserve = 2n * 10n ** 15n;
+      const gasReserve = 1n * 10n ** 14n; // 0.0001 ETH
       const availableBalance =
         ethBalance > gasReserve ? ethBalance - gasReserve : 0n;
       
@@ -274,9 +274,9 @@ export const validateTradeBalance = async (
         return {
           isValid: false,
           currentBalance: ethBalance,
-          message: `Insufficient ETH balance. Your balance: ${ethers.utils.formatEther(
+          message: `Insufficient ETH balance. Your balance: ${ethers.formatEther(
             ethBalance
-          )} ETH, required: ~${ethers.utils.formatEther(
+          )} ETH, required: ~${ethers.formatEther(
             amount + gasReserve
           )} ETH (trade + gas)`,
         };

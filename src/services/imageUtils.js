@@ -1,166 +1,32 @@
 /**
- * Together API'dan görsel indirme ve IPFS'e yükleme için yardımcı fonksiyonlar
+ * SDK ile doğrudan çalışmak için basitleştirilmiş image utilities
  */
 
 import { storeToIPFS } from "./pinata";
 
-// Helper function to get the base URL
-const getBaseUrl = () => {
-  return typeof window !== 'undefined' 
-    ? window.location.origin 
-    : process.env.NEXT_PUBLIC_URL || 'http://localhost:3000';
-};
-
 /**
- * Together API'dan gelen görseli indirir ve IPFS'e yükler
- * @param {string} originalUrl Together API'dan alınan orijinal görsel URL'si
+ * Görsel verisini IPFS'e yükle
+ * @param {Blob|File} imageData Görsel dosyası
  * @returns {Promise<string>} IPFS URI (ipfs://...)
  */
-export async function downloadImageAndUploadToIPFS(originalUrl) {
+export async function uploadImageToIPFS(imageData) {
   try {
-    console.log("Görsel indiriliyor:", originalUrl);
-
-    // 1. Together API URL'sini kendi API endpoint'imiz üzerinden yönlendir
-    const baseUrl = getBaseUrl();
-    const proxyUrl = `${baseUrl}/api/together?url=${encodeURIComponent(originalUrl)}`;
-
-    // 2. Proxy üzerinden görsel indir (CORS sorunu olmadan)
-    const response = await fetch(proxyUrl);
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error("Görsel indirme hatası:", errorData);
-      throw new Error(`Görsel indirme hatası: ${response.status}`);
+    // Doğrudan IPFS'e yükleme
+    const result = await storeToIPFS(imageData);
+    
+    if (!result || !result.url) {
+      throw new Error("IPFS storage failed: No URL returned");
     }
-
-    // 3. Blob olarak al
-    const imageBlob = await response.blob();
-    console.log("Görsel indirildi, boyut:", imageBlob.size);
-
-    if (imageBlob.size === 0) {
-      throw new Error("İndirilen görsel verisi boş");
-    }
-
-    // 4. IPFS'e yükle
-    const ipfsResult = await storeToIPFS(imageBlob);
-    console.log("IPFS yükleme başarılı:", ipfsResult);
-
-    // 5. IPFS URI kontrolü ve döndürme
-    if (!ipfsResult || !ipfsResult.url) {
-      throw new Error("IPFS yükleme sonucu geçersiz: URL bulunamadı");
-    }
-
-    // ipfs:// formatını kontrol et
-    const ipfsUri = ipfsResult.url;
-    if (!ipfsUri.startsWith("ipfs://")) {
-      console.warn("IPFS URI ipfs:// ile başlamıyor, düzeltiliyor:", ipfsUri);
-      const hash = ipfsResult.hash || ipfsUri.split("/").pop();
-      return `ipfs://${hash}`;
-    }
-
-    return ipfsUri; // ipfs://...
+    
+    return result.url; // ipfs://... formatında URL döndürür
   } catch (error) {
-    console.error("Görsel indirme ve IPFS yükleme hatası:", error);
-
-    // Hata durumunda, orijinal URL'yi IPFS formatında döndürmeye çalış
-    if (originalUrl) {
-      // URL bir IPFS hash'i içeriyorsa onu kullan
-      if (originalUrl.includes("/ipfs/")) {
-        const hash = originalUrl.split("/ipfs/").pop();
-        console.log("Hata durumunda IPFS hash extract edildi:", hash);
-        return `ipfs://${hash}`;
-      }
-
-      // Direkt olarak görsel URL'sini döndür (fallback)
-      console.log("Hata durumunda orijinal URL kullanılıyor");
-      return originalUrl;
-    }
-
+    console.error("Error uploading image to IPFS:", error);
     throw error;
   }
 }
 
 /**
- * Together API'dan metin tamamlama isteği yapar
- * @param {string} prompt İstek metni
- * @param {string} model Kullanılacak model (varsayılan: togethercomputer/llama-2-70b)
- * @returns {Promise<object>} Together API yanıtı
- */
-export async function generateTextWithTogether(
-  prompt,
-  model = "togethercomputer/llama-2-70b"
-) {
-  try {
-    const baseUrl = getBaseUrl();
-    const response = await fetch(`${baseUrl}/api/together`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, model }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Text generation failed");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Together API text generation error:", error);
-    throw error;
-  }
-}
-
-/**
- * Together API ile görsel oluşturur ve IPFS'e yükler
- * @param {string} prompt Görsel oluşturma promptu
- * @param {string} model Kullanılacak model (varsayılan: black-forest-labs/FLUX.1-schnell-Free)
- * @returns {Promise<string>} IPFS URI
- */
-export async function generateAndUploadImage(
-  prompt,
-  model = "black-forest-labs/FLUX.1-schnell-Free"
-) {
-  try {
-    // 1. Together API'dan görsel oluştur
-    const baseUrl = getBaseUrl();
-    const imageResponse = await fetch(`${baseUrl}/api/together`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        prompt,
-        model,
-        width: 768,
-        height: 768,
-        n: 1,
-        response_format: "url",
-        output_format: "png",
-        negative_prompt:
-          "logo, corporate design, text, letters, numbers, watermark, signature, blurry, low quality, oversaturated colors",
-      }),
-    });
-
-    if (!imageResponse.ok) {
-      const errorData = await imageResponse.json();
-      throw new Error(errorData.error || "Image generation failed");
-    }
-
-    const data = await imageResponse.json();
-    const originalImageUrl = data.data?.[0]?.url; // Updated to match expected response format
-
-    if (!originalImageUrl) {
-      throw new Error("No image URL returned from API");
-    }
-
-    // 2. Görseli indir ve IPFS'e yükle
-    return await downloadImageAndUploadToIPFS(originalImageUrl);
-  } catch (error) {
-    console.error("Görsel oluşturma ve yükleme hatası:", error);
-    throw error;
-  }
-}
-
-/**
- * IPFS hash'ini görüntülenebilir bir URL'ye dönüştürür
+ * IPFS URI'yi HTTP URL'e dönüştürür
  * @param {string} ipfsUri IPFS URI (ipfs://...)
  * @returns {string} HTTP URL
  */
@@ -175,62 +41,203 @@ export function getIPFSDisplayUrl(ipfsUri) {
   // "ipfs://" kısmını ayır ve hash'i al
   const hash = ipfsUri.slice(7);
   
-  // Güvenilir ve hızlı bir gateway kullan
-  return `https://gateway.pinata.cloud/ipfs/${hash}`;
+  // Zora uyumlu gateway kullan
+  return `https://ipfs.io/ipfs/${hash}`;
 }
 
 /**
- * Download images from Together API and upload to IPFS
- * @param {string} originalUrl Together API'dan alınan orijinal görsel URL'si
- * @returns {Promise<string>} IPFS URI (ipfs://...)
+ * Validates and normalizes IPFS URIs to ensure proper format
+ * @param {string} uri - URI to validate (could be IPFS URI or HTTP URL)
+ * @returns {Object} Object containing validation result with properties: valid, message, and uri
  */
-export async function processTtlgenHerImage(originalUrl) {
-  try {
-    // 1. Image URL validation
-    if (!originalUrl || typeof originalUrl !== "string") {
-      throw new Error("Invalid image URL");
-    }
+export function validateIpfsUri(uri) {
+  if (!uri) {
+    return {
+      valid: false,
+      message: "URI is required",
+      uri: ""
+    };
+  }
 
-    // Detect Together API, Amazon S3 or similar temporary URLs
-    if (originalUrl.includes("together.xyz") || 
-        originalUrl.includes("replicate.delivery") || 
-        originalUrl.includes("amazonaws.com") ||
-        originalUrl.includes("blob:")) {
-      try {
-        // Download image through proxy and upload to IPFS
-        const ipfsResult = await downloadImageAndUploadToIPFS(originalUrl);
+  // If already in correct ipfs:// format, return as is
+  if (uri.startsWith('ipfs://')) {
+    return {
+      valid: true,
+      message: "URI validated",
+      uri: uri
+    };
+  }
 
-        if (ipfsResult && ipfsResult.startsWith("ipfs://")) {
-          console.log("Image successfully uploaded to IPFS:", ipfsResult);
-          
-          // IPFS URL'yi HTTP formatına dönüştür ve döndür, böylece browserda görüntülenebilir
-          const httpUrl = getIPFSDisplayUrl(ipfsResult);
-          console.log("HTTP gateway URL for display:", httpUrl);
-          
-          return ipfsResult; // ipfs:// formatını döndür, CoinCreator içinde gösterilecek
-        } else {
-          console.error("IPFS conversion failed, result:", ipfsResult);
-          throw new Error("IPFS conversion returned invalid URI");
-        }
-      } catch (downloadError) {
-        console.error("Image download or IPFS upload error:", downloadError);
-        throw downloadError;
+  // Extract IPFS hash from HTTP gateway URLs
+  if (uri.includes('/ipfs/')) {
+    const parts = uri.split('/ipfs/');
+    if (parts.length >= 2) {
+      const hash = parts[1].split('/')[0].split('?')[0];
+      if (hash && hash.length > 0) {
+        return {
+          valid: true,
+          message: "HTTP gateway URL converted to IPFS URI",
+          uri: `ipfs://${hash}`
+        };
       }
     }
+  }
 
-    // For other image types use existing process (don't change if already ipfs://)
-    if (originalUrl.startsWith("ipfs://")) {
-      return originalUrl;
+  // Handle pinata and other gateway direct links
+  const uriParts = uri.split('/');
+  const potentialHash = uriParts[uriParts.length - 1].split('?')[0];
+  
+  // Check if the last segment looks like an IPFS hash (reasonable length check)
+  if (potentialHash && potentialHash.length > 20) {
+    return {
+      valid: true,
+      message: "Direct gateway URL converted to IPFS URI",
+      uri: `ipfs://${potentialHash}`
+    };
+  }
+
+  // If we can't convert it, return the original URI with a warning
+  console.warn(`Could not normalize URI to IPFS format: ${uri}`);
+  return {
+    valid: true, // Still valid but with warning
+    message: "Could not convert to IPFS format, using original URI",
+    uri: uri
+  };
+}
+
+/**
+ * Token metadata'sı oluştur ve IPFS'e yükle
+ * @param {string} imageUrl Görsel URL'i (öncelikle IPFS URI olmalı)
+ * @param {string} name Token adı
+ * @param {string} symbol Token sembolü
+ * @param {string} description Token açıklaması
+ * @returns {Promise<{ipfsUrl: string, displayUrl: string}>} IPFS URI ve HTTP display URL
+ */
+export async function processImageAndUploadToIPFS(imageUrl, name, symbol, description) {
+    try {
+        // 1. Temel validasyon
+        if (!imageUrl) throw new Error("Image URL is required");
+        if (!name) throw new Error("Token name is required");
+        if (!symbol) throw new Error("Token symbol is required");
+
+        console.log("Processing image for IPFS upload:", { name, symbol });
+        
+        // 2. Basit metadata oluştur - Zora SDK formatına uygun
+        const metadata = {
+            name,
+            symbol,
+            description: description || `${name} (${symbol}) - A token created with VisionZ`,
+            image: imageUrl
+        };
+        
+        // 3. Metadata'yı JSON olarak IPFS'e yükle
+        const metadataResult = await uploadJsonToIPFS(metadata);
+        console.log("Metadata uploaded to IPFS:", metadataResult);
+        
+        if (!metadataResult.url) {
+            throw new Error("Failed to upload metadata to IPFS");
+        }
+        
+        // 4. IPFS URI ve HTTP URL döndür
+        return {
+            ipfsUrl: metadataResult.url, // ipfs:// formatında, blockchain için
+            displayUrl: getIPFSDisplayUrl(imageUrl) // HTTP URL, görüntüleme için
+        };
+    } catch (error) {
+        console.error("Failed to process image and upload to IPFS:", error);
+        throw error;
     }
+}
 
-    // Upload standard URLs to IPFS as well
-    console.log(
-      "Standard image URL detected, will upload to IPFS:",
-      originalUrl
-    );
-    return await downloadImageAndUploadToIPFS(originalUrl);
+/**
+ * JSON metadata'yı IPFS'e yükle
+ * @param {Object} metadata Token metadata objesi
+ * @returns {Promise<{url: string, hash: string}>} IPFS bilgileri
+ */
+export async function uploadJsonToIPFS(metadata) {
+    try {
+        console.log("Uploading JSON to IPFS:", metadata);
+        
+        // 1. JSON'ı Blob'a dönüştür
+        const jsonBlob = new Blob([JSON.stringify(metadata, null, 2)], {
+            type: "application/json"
+        });
+        
+        // 2. IPFS'e yükle
+        const result = await storeToIPFS(jsonBlob, `${metadata.name}_metadata.json`);
+        console.log("JSON uploaded to IPFS:", result);
+        
+        if (!result || !result.url) {
+            throw new Error("IPFS upload result is invalid");
+        }
+        
+        return result;
+    } catch (error) {
+        console.error("JSON upload to IPFS failed:", error);
+        throw error;
+    }
+}
+
+/**
+ * Processes images from ttlgenHer or other external services to ensure IPFS compatibility
+ * @param {string} imageUrl - The image URL to process (could be from ttlgenHer or other sources)
+ * @returns {Promise<string>} - Returns a promise that resolves to an IPFS URL for the image
+ */
+export async function processTtlgenHerImage(imageUrl) {
+  try {
+    if (!imageUrl) {
+      throw new Error("No image URL provided");
+    }
+    
+    console.log("Processing external image URL:", imageUrl);
+    
+    // First check if it's already an IPFS URI
+    if (imageUrl.startsWith('ipfs://')) {
+      console.log("Image is already in IPFS format, returning as is");
+      return imageUrl;
+    }
+    
+    // For external URLs, we need to fetch the image and upload it to IPFS
+    // This is similar to processImageAndUploadToIPFS but specifically for external services
+    
+    // Validate URL format
+    try {
+      new URL(imageUrl);
+    } catch (e) {
+      console.error("Invalid URL format:", imageUrl);
+      throw new Error("Invalid image URL format");
+    }
+    
+    // Get validation result - this helps normalize gateway URLs
+    const validation = validateIpfsUri(imageUrl);
+    
+    // If the validation converted it to a proper IPFS URI, use that
+    if (validation.valid && validation.uri.startsWith('ipfs://')) {
+      console.log("Converted to IPFS URI:", validation.uri);
+      return validation.uri;
+    }
+    
+    // Otherwise, we need to fetch and upload the image
+    console.log("Fetching image from external URL to upload to IPFS...");
+    
+    try {
+      // Try to upload the image directly using our existing function
+      const ipfsHash = await uploadImageToIPFS(imageUrl);
+      if (ipfsHash) {
+        const ipfsUri = `ipfs://${ipfsHash}`;
+        console.log("Successfully uploaded image to IPFS:", ipfsUri);
+        return ipfsUri;
+      }
+    } catch (uploadError) {
+      console.error("Error uploading image to IPFS:", uploadError);
+      // Continue with fallback approach
+    }
+    
+    // If we couldn't upload it ourselves, use the original URL as a fallback
+    console.warn("Could not upload to IPFS, returning original URL as fallback");
+    return imageUrl;
   } catch (error) {
-    console.error("Together image processing error:", error);
-    throw error; // Propagate error up
+    console.error("Error processing image:", error);
+    throw error;
   }
 }

@@ -17,6 +17,17 @@
   --success: #4CAF50;
   --error: #EF476F;
   --radius: 0.75rem;
+  --retro-primary: #ff6b35;
+  --retro-secondary: #f7c59f;
+  --retro-accent: #efefd0;
+  --retro-dark: transparent;
+  --retro-darker: #1a1a1a;
+  --retro-light: #f7f7f2;
+  --retro-border: #2b2b2b;
+  --retro-success: #00a676;
+  --retro-error: #d7263d;
+  --retro-font: 'Press Start 2P', 'Courier New', monospace;
+  --body-font: 'VT323', 'Courier New', monospace;
 }
 
 body {
@@ -42,42 +53,42 @@ body {
 
 @layer components {
   .card {
-    @apply p-5 rounded-xl shadow-sm border border-gray-mid;
+    @apply p-4 rounded-xl shadow-sm border border-gray-mid;
     background-color: #ffffff;
     color: var(--foreground);
   }
   
   .container-sm {
-    @apply w-full max-w-md mx-auto px-4;
+    @apply w-full max-w-md mx-auto px-3;
   }
   
   .input-field {
-    @apply rounded-lg border border-gray-mid px-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent;
+    @apply rounded-sm border border-gray-mid px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent;
     background-color: #ffffff;
     color: var(--foreground);
   }
   
   .btn-primary {
-    @apply bg-primary hover:bg-primary-dark text-white font-medium py-3 px-6 rounded-lg transition-colors;
+    @apply bg-primary hover:bg-primary-dark text-white font-medium py-2 px-4 rounded-sm transition-colors;
   }
   
   .btn-secondary {
-    @apply bg-gray-light font-medium py-3 px-6 rounded-lg transition-colors;
+    @apply bg-gray-light font-medium py-2 px-4 rounded-sm transition-colors;
     color: var(--foreground);
   }
   
   .section {
-    @apply py-4;
+    @apply py-3;
   }
 
   /* Get Started section */
   .get-started {
-    @apply mb-8 p-6 rounded-xl bg-white border border-gray-mid;
+    @apply mb-6 p-4 rounded-xl bg-white border border-gray-mid;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   }
   
   .get-started-step {
-    @apply flex items-start pb-4 mb-4 border-b border-gray-mid;
+    @apply flex items-start pb-3 mb-3 border-b border-gray-mid;
   }
   
   .get-started-step:last-child {
@@ -87,8 +98,8 @@ body {
 
 /* Step number - fix for Tailwind compilation */
 .step-number {
-  width: 2rem;
-  height: 2rem;
+  width: 1.75rem;
+  height: 1.75rem;
   border-radius: 9999px;
   background-color: rgba(124, 101, 193, 0.1);
   display: flex;
@@ -101,16 +112,16 @@ body {
 
 /* Minimal progress steps */
 .step-indicator {
-  @apply flex items-center gap-1.5 mb-6;
+  @apply flex items-center gap-1.5 mb-4;
 }
 
 .step-dot {
-  @apply w-2.5 h-2.5 rounded-full bg-gray-mid;
+  @apply w-2 h-2 rounded-full bg-gray-mid;
   transition: all 0.3s ease;
 }
 
 .step-dot.active {
-  @apply bg-primary w-4 h-4;
+  @apply bg-primary w-3 h-3;
 }
 
 /* Modern animation utilities */
@@ -121,4 +132,451 @@ body {
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+/* Retro styling elements */
+.retro-container {
+  background-color: var(--retro-darker);
+  color: var(--retro-light);
+  border: 3px solid var(--retro-border);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.2);
+  padding: 0.75rem;
+  border-radius: 2px;
+  position: relative;
+}
+
+.retro-header {
+  font-family: var(--retro-font);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: 2px 2px 0px var(--retro-darker);
+  margin-bottom: 0.75rem;
+  color: var(--retro-primary);
+  font-size: 0.875rem;
+}
+
+.retro-input {
+  background-color: var(--retro-darker);
+  border: 2px solid var(--retro-primary);
+  color: var(--retro-accent);
+  padding: 0.5rem;
+  font-family: var(--body-font);
+  font-size: 1rem;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.retro-input:focus {
+  outline: none;
+  border-color: var(--retro-secondary);
+  box-shadow: 0 0 0 2px var(--retro-secondary);
+}
+
+.retro-select {
+  appearance: none;
+  background-color: var(--retro-darker);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ff6b35'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 1.2em;
+  border: 2px solid var(--retro-primary);
+  color: var(--retro-accent);
+  padding: 0.5rem;
+  font-family: var(--body-font);
+  font-size: 1rem;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.2);
+}
+
+.retro-button {
+  font-family: var(--retro-font);
+  background-color: var(--retro-primary);
+  color: var(--retro-darker);
+  border: none;
+  padding: 0.5rem 1rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.2);
+  position: relative;
+  border-radius: 2px;
+  font-size: 0.75rem;
+}
+
+.retro-button:hover {
+  background-color: var(--retro-secondary);
+  transform: translate(1px, 1px);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.2);
+}
+
+.retro-button:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.2);
+}
+
+.retro-button-outline {
+  font-family: var(--retro-font);
+  background-color: transparent;
+  color: var(--retro-primary);
+  border: 2px solid var(--retro-primary);
+  padding: 0.5rem 1rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.2);
+  position: relative;
+  border-radius: 2px;
+  font-size: 0.75rem;
+}
+
+.retro-button-outline:hover {
+  background-color: var(--retro-primary);
+  color: var(--retro-darker);
+}
+
+.retro-card {
+  background-color: var(--retro-dark);
+  border: 3px solid var(--retro-border);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.2);
+  padding: 1rem;
+  border-radius: 2px;
+  margin-bottom: 1rem;
+}
+
+.retro-card-header {
+  font-family: var(--retro-font);
+  color: var(--retro-secondary);
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+}
+
+.retro-label {
+  font-family: var(--retro-font);
+  color: var(--retro-primary);
+  margin-bottom: 0.25rem;
+  display: block;
+  font-size: 0.75rem;
+  letter-spacing: 1px;
+}
+
+.retro-progress {
+  height: 1.25rem;
+  width: 100%;
+  background-color: var(--retro-darker);
+  border: 2px solid var(--retro-primary);
+  position: relative;
+  overflow: hidden;
+}
+
+.retro-progress-bar {
+  height: 100%;
+  background-color: var(--retro-primary);
+  transition: width 0.3s ease;
+}
+
+.retro-slider {
+  appearance: none;
+  width: 100%;
+  height: 10px;
+  background: var(--retro-darker);
+  border: 2px solid var(--retro-primary);
+  outline: none;
+}
+
+.retro-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: var(--retro-primary);
+  cursor: pointer;
+  border: 2px solid var(--retro-darker);
+}
+
+.retro-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background: var(--retro-primary);
+  cursor: pointer;
+  border: 2px solid var(--retro-darker);
+}
+
+.retro-checkbox {
+  position: relative;
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+}
+
+.retro-checkbox input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.retro-checkbox-mark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 18px;
+  width: 18px;
+  background-color: var(--retro-darker);
+  border: 2px solid var(--retro-primary);
+}
+
+.retro-checkbox input:checked ~ .retro-checkbox-mark {
+  background-color: var(--retro-primary);
+}
+
+.retro-checkbox-mark:after {
+  content: "";
+  position: absolute;
+  display: none;
+}
+
+.retro-checkbox input:checked ~ .retro-checkbox-mark:after {
+  display: block;
+}
+
+.retro-checkbox .retro-checkbox-mark:after {
+  left: 5px;
+  top: 2px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--retro-darker);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.pixelated {
+  image-rendering: pixelated;
+}
+
+.retro-step-indicator {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  position: relative;
+}
+
+.retro-step-indicator::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-color: var(--retro-darker);
+  transform: translateY(-50%);
+  z-index: 0;
+}
+
+.retro-step {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--retro-primary);
+  background-color: var(--retro-darker);
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--retro-font);
+  color: var(--retro-primary);
+  position: relative;
+  z-index: 1;
+  font-size: 0.75rem;
+}
+
+.retro-step.active {
+  background-color: var(--retro-primary);
+  color: var(--retro-darker);
+}
+
+.retro-step.completed {
+  background-color: var(--retro-success);
+  border-color: var(--retro-success);
+  color: var(--retro-darker);
+}
+
+.retro-badge {
+  display: inline-block;
+  background-color: var(--retro-primary);
+  color: var(--retro-darker);
+  font-family: var(--body-font);
+  padding: 0.15rem 0.4rem;
+  border-radius: 2px;
+  font-size: 0.8rem;
+  margin-right: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.retro-notification {
+  padding: 0.75rem;
+  border: 2px solid;
+  margin-bottom: 0.75rem;
+  font-family: var(--body-font);
+  position: relative;
+}
+
+.retro-notification.error {
+  border-color: var(--retro-error);
+  background-color: rgba(215, 38, 61, 0.1);
+  color: var(--retro-error);
+}
+
+.retro-notification.success {
+  border-color: var(--retro-success);
+  background-color: rgba(0, 166, 118, 0.1);
+  color: var(--retro-success);
+}
+
+/* Animation effects */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.retro-blink {
+  animation: blink 1s steps(1) infinite;
+}
+
+@keyframes scanline {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(100%); }
+}
+
+.retro-scanline {
+  position: relative;
+  overflow: hidden;
+}
+
+.retro-scanline::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  animation: scanline 4s linear infinite;
+  pointer-events: none;
+}
+
+/* CRT Screen Effect */
+.crt-effect {
+  position: relative;
+  overflow: hidden;
+  border-radius: 2px;
+}
+
+.crt-effect::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%, 
+    rgba(0, 0, 0, 0.1) 50%
+  );
+  background-size: 100% 3px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.retro-grid-background {
+  background-image: 
+    linear-gradient(rgba(255,107,53, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,107,53, 0.1) 1px, transparent 1px);
+  background-size: 8px 8px;
+  background-position: -1px -1px;
+}
+
+.retro-glow {
+  text-shadow: 0 0 4px var(--retro-primary), 0 0 8px var(--retro-primary);
+}
+
+/* Loading animation */
+.retro-loading {
+  display: inline-block;
+  position: relative;
+  width: 60px;
+  height: 16px;
+}
+
+.retro-loading div {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--retro-light);
+  animation: retro-loading 1.2s cubic-bezier(0, 0.5, 0.5, 1) infinite;
+}
+
+.retro-loading div:nth-child(1) {
+  left: 6px;
+  animation-delay: -0.24s;
+}
+
+.retro-loading div:nth-child(2) {
+  left: 24px;
+  animation-delay: -0.12s;
+}
+
+.retro-loading div:nth-child(3) {
+  left: 42px;
+  animation-delay: 0;
+}
+
+@keyframes retro-loading {
+  0% { top: 6px; height: 12px; }
+  50%, 100% { top: 18px; height: 6px; }
+}
+
+/* Add Farcaster safe area insets support */
+.farcaster-safe-container {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  .retro-header {
+    font-size: 0.8rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .retro-container {
+    padding: 0.5rem;
+    border-width: 2px;
+    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.2);
+  }
+  
+  .retro-button {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.7rem;
+  }
+  
+  .retro-button-outline {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.7rem;
+  }
+  
+  .retro-card {
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .retro-card-header {
+    font-size: 0.85rem;
+  }
 }

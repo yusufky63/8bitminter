@@ -35,16 +35,20 @@ async function checkPort(port) {
 async function killProcessOnPort(port) {
   try {
     if (process.platform === 'win32') {
-      // Windows: Use netstat to find the process
-      const netstat = spawn('netstat', ['-ano', '|', 'findstr', `:${port}`]);
-      netstat.stdout.on('data', (data) => {
-        const match = data.toString().match(/\s+(\d+)$/);
-        if (match) {
-          const pid = match[1];
-          spawn('taskkill', ['/F', '/PID', pid]);
+      // Windows: Use exec instead of pipe operators which don't work properly when spawned
+      const { exec } = await import('child_process');
+      exec(`netstat -ano | findstr :${port}`, (error, stdout) => {
+        if (error || !stdout) return;
+        
+        const lines = stdout.toString().split('\n');
+        for (const line of lines) {
+          const match = line.match(/\s+(\d+)$/);
+          if (match) {
+            const pid = match[1];
+            exec(`taskkill /F /PID ${pid}`);
+          }
         }
       });
-      await new Promise((resolve) => netstat.on('close', resolve));
     } else {
       // Unix-like systems: Use lsof
       const lsof = spawn('lsof', ['-ti', `:${port}`]);
@@ -131,14 +135,17 @@ async function startDev() {
   
   // Start next dev with appropriate configuration
   const nextBin = process.platform === 'win32' 
-    ? path.join(projectRoot, 'node_modules', '.bin', 'next.cmd')
+    ? 'next.cmd'
     : path.join(projectRoot, 'node_modules', '.bin', 'next');
 
-  nextDev = spawn(nextBin, ['dev'], {
+  const spawnOptions = {
     stdio: 'inherit',
     env: { ...process.env, NEXT_PUBLIC_URL: frameUrl, NEXTAUTH_URL: frameUrl },
-    cwd: projectRoot
-  });
+    cwd: projectRoot,
+    shell: process.platform === 'win32' // Use shell on Windows
+  };
+
+  nextDev = spawn(nextBin, ['dev'], spawnOptions);
 
   // Handle cleanup
   const cleanup = async () => {

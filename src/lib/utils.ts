@@ -92,12 +92,8 @@ export async function getFarcasterMetadata(): Promise<FrameMetadata> {
     };
   }
 
-  // Determine webhook URL based on whether Neynar is enabled
-  const neynarApiKey = process.env.NEYNAR_API_KEY;
-  const neynarClientId = process.env.NEYNAR_CLIENT_ID;
-  const webhookUrl = neynarApiKey && neynarClientId 
-    ? `https://api.neynar.com/f/app/${neynarClientId}/event`
-    : `${appUrl}/api/webhook`;
+  // Set the webhook URL to the application's API endpoint
+  const webhookUrl = `${appUrl}/api/webhook`;
 
   return {
     accountAssociation,

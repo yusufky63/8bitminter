@@ -4,18 +4,18 @@ import App from "./app";
 const appUrl = process.env.NEXT_PUBLIC_URL || "https://visionz-mini.vercel.app";
 
 // frame preview metadata
-const appName = process.env.NEXT_PUBLIC_FRAME_NAME || "VisionZ Coin Creator";
-const splashImageUrl = `${appUrl}/splash.png`;
-const appDescription = process.env.NEXT_PUBLIC_FRAME_DESCRIPTION || "Create AI-powered Zora coins with Farcaster";
-const buttonText = process.env.NEXT_PUBLIC_FRAME_BUTTON_TEXT || "Create Coin";
+const appName = process.env.NEXT_PUBLIC_FRAME_NAME || "Coin Creator";
+const splashImageUrl = `${appUrl}/logo.png`;
+const appDescription = process.env.NEXT_PUBLIC_FRAME_DESCRIPTION || "Create RETRO AI-powered tokens on Farcaster";
+const buttonText = process.env.NEXT_PUBLIC_FRAME_BUTTON_TEXT || "Create Vision";
 
-// Brand color for Farcaster - using our purple primary color
-const brandColor = "#7C65C1"; 
+// Brand color for Farcaster - using our indigo-violet gradient
+const brandColor = "#6366F1"; 
 
 // Updated to match Farcaster Frame specification v1
 const framePreviewMetadata = {
   version: "1",
-  imageUrl: `${appUrl}/opengraph-image`,
+  imageUrl: `${appUrl}/logo.png`,
   button: {
     title: buttonText,
     action: {
@@ -37,7 +37,7 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       title: appName,
       description: appDescription,
-      images: [`${appUrl}/opengraph-image`],
+      images: [`${appUrl}/logo.png`],
     },
     other: {
       "fc:frame": JSON.stringify(framePreviewMetadata),

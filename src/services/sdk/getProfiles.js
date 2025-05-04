@@ -255,7 +255,7 @@ export const getProfileBalance = async (
       if (error.isRateLimit || error.status === 429 || 
           (error.message && error.message.toLowerCase().includes("rate limit"))) {
         console.warn("[getProfileBalance] Rate limit error detected");
-        const waitTime = 8000;
+        const waitTime = 4000;
         console.log(`[getProfileBalance] Waiting for ${waitTime/1000}s before retrying...`);
         await new Promise((resolve) => setTimeout(resolve, waitTime));
         continue;

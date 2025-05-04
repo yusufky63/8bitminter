@@ -25,6 +25,16 @@ export default {
         },
         success: 'var(--success)',
         error: 'var(--error)',
+        // Retro theme colors
+        'retro-primary': 'var(--retro-primary)',
+        'retro-secondary': 'var(--retro-secondary)',
+        'retro-accent': 'var(--retro-accent)',
+        'retro-dark': 'var(--retro-dark)',
+        'retro-darker': 'var(--retro-darker)',
+        'retro-light': 'var(--retro-light)',
+        'retro-border': 'var(--retro-border)',
+        'retro-success': 'var(--retro-success)',
+        'retro-error': 'var(--retro-error)',
   		},
   		borderRadius: {
   			lg: 'var(--radius)',
@@ -35,16 +45,21 @@ export default {
   		},
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        mono: ['VT323', 'Courier New', 'monospace'],
+        pixel: ['"Press Start 2P"', 'Courier New', 'monospace'],
       },
       boxShadow: {
         sm: '0 1px 2px rgba(0, 0, 0, 0.05)',
         DEFAULT: '0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06)',
         md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
         lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+        'retro': '5px 5px 0 rgba(0, 0, 0, 0.2)',
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-in-out',
         'slide-up': 'slideUp 0.4s ease-out',
+        'scanline': 'scanline 4s linear infinite',
+        'blink': 'blink 1s steps(1) infinite',
       },
       keyframes: {
         fadeIn: {
@@ -54,6 +69,14 @@ export default {
         slideUp: {
           '0%': { transform: 'translateY(10px)', opacity: '0' },
           '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        scanline: {
+          '0%': { transform: 'translateY(0)' },
+          '100%': { transform: 'translateY(100%)' },
+        },
+        blink: {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0' },
         },
       },
   	}

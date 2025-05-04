@@ -16,33 +16,6 @@ const reset = '\x1b[0m';
 // First load .env for main config
 dotenv.config({ path: '.env' });
 
-async function lookupFidByCustodyAddress(custodyAddress, apiKey) {
-  if (!apiKey) {
-    throw new Error('Neynar API key is required');
-  }
-
-  const response = await fetch(
-    `https://api.neynar.com/v2/farcaster/user/custody-address?custody_address=${custodyAddress}`,
-    {
-      headers: {
-        'accept': 'application/json',
-        'x-api-key': apiKey
-      }
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`Failed to lookup FID: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  if (!data.user?.fid) {
-    throw new Error('No FID found for this custody address');
-  }
-
-  return data.user.fid;
-}
-
 async function loadEnvLocal() {
   try {
     if (fs.existsSync('.env.local')) {
@@ -110,27 +83,6 @@ async function validateDomain(domain) {
   return cleanDomain;
 }
 
-async function queryNeynarApp(apiKey) {
-  if (!apiKey) {
-    return null;
-  }
-  try {
-    const response = await fetch(
-      `https://api.neynar.com/portal/app_by_api_key`,
-      {
-        headers: {
-          'x-api-key': apiKey
-        }
-      }
-    );
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error querying Neynar app data:', error);
-    return null;
-  }
-}
-
 async function validateSeedPhrase(seedPhrase) {
   try {
     // Try to create an account from the seed phrase
@@ -141,11 +93,10 @@ async function validateSeedPhrase(seedPhrase) {
   }
 }
 
-async function generateFarcasterMetadata(domain, fid, accountAddress, seedPhrase, webhookUrl) {
+async function generateFarcasterMetadata(domain, accountAddress, seedPhrase, webhookUrl) {
   const header = {
     type: 'custody',
     key: accountAddress,
-    fid,
   };
   const encodedHeader = Buffer.from(JSON.stringify(header), 'utf-8').toString('base64');
 
@@ -182,6 +133,35 @@ async function generateFarcasterMetadata(domain, fid, accountAddress, seedPhrase
 
 async function main() {
   try {
+    // Check for non-interactive flag
+    const args = process.argv.slice(2);
+    const nonInteractive = args.includes('--non-interactive');
+    
+    if (nonInteractive) {
+      // Use default values
+      console.log('Running in non-interactive mode with default values');
+      const domain = process.env.NEXT_PUBLIC_URL?.replace('https://', '') || 'visionz-mini.vercel.app';
+      const frameName = process.env.NEXT_PUBLIC_FRAME_NAME || 'VisionZ Retro';
+      const buttonText = process.env.NEXT_PUBLIC_FRAME_BUTTON_TEXT || 'Create Vision';
+      
+      // Update .env file with default values
+      const envVars = [
+        `NEXT_PUBLIC_URL="https://${domain}"`,
+        `NEXT_PUBLIC_FRAME_NAME="${frameName}"`,
+        `NEXT_PUBLIC_FRAME_BUTTON_TEXT="${buttonText}"`,
+        `NEXT_PUBLIC_FRAME_HUB_SYNC=true`
+      ];
+      
+      fs.writeFileSync('.env', envVars.join('\n') + '\n');
+      console.log('✅ Updated .env file with default values');
+      
+      // Build the project
+      console.log('\n🔨 Building your project...');
+      execSync('npx next build', { stdio: 'inherit' });
+      console.log('✅ Build completed');
+      return;
+    }
+
     console.log('\n📝 Checking environment variables...');
     console.log('Loading values from .env...');
     
@@ -237,165 +217,193 @@ async function main() {
       }
     ]);
 
-    // Get Neynar configuration
-    let neynarApiKey = process.env.NEYNAR_API_KEY;
-    let neynarClientId = process.env.NEYNAR_CLIENT_ID;
-    let useNeynar = true;
+    // Get authentication details
+    const { useSeedPhrase } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'useSeedPhrase',
+        message: 'Do you want to use a seed phrase for frame ownership (recommended)?',
+        default: true,
+      }
+    ]);
 
-    while (useNeynar) {
-      if (!neynarApiKey) {
-        const { neynarApiKey: inputNeynarApiKey } = await inquirer.prompt([
+    let seedPhrase;
+    let accountAddress;
+
+    if (useSeedPhrase) {
+      let existingSeedPhrase = process.env.SEED_PHRASE;
+      if (existingSeedPhrase) {
+        const { useExistingSeedPhrase } = await inquirer.prompt([
           {
-            type: 'password',
-            name: 'neynarApiKey',
-            message: 'Enter your Neynar API key (optional - leave blank to skip):',
-            default: null
+            type: 'confirm',
+            name: 'useExistingSeedPhrase',
+            message: 'Use existing seed phrase from .env or .env.local?',
+            default: true,
           }
         ]);
-        neynarApiKey = inputNeynarApiKey;
-      } else {
-        console.log('Using existing Neynar API key from .env');
-      }
 
-      if (!neynarApiKey) {
-        useNeynar = false;
-        break;
-      }
-
-      // Try to get client ID from API
-      const appInfo = await queryNeynarApp(neynarApiKey);
-      if (appInfo) {
-        neynarClientId = appInfo.app_uuid;
-        console.log('✅ Fetched Neynar app client ID');
-        break;
-      }
-
-      // If we get here, the API key was invalid
-      console.log('\n⚠️  Could not find Neynar app information. The API key may be incorrect.');
-      const { retry } = await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: 'retry',
-          message: 'Would you like to try a different API key?',
-          default: true
+        if (useExistingSeedPhrase) {
+          seedPhrase = existingSeedPhrase;
+          accountAddress = await validateSeedPhrase(seedPhrase);
+          console.log(`✅ Using existing seed phrase with address ${accountAddress}`);
+        } else {
+          // Generate a new seed phrase
+          let valid = false;
+          while (!valid) {
+            const { seedInput } = await inquirer.prompt([
+              {
+                type: 'password',
+                name: 'seedInput',
+                message: 'Enter your seed phrase (12 or 24 words):',
+                validate: (input) => {
+                  if (!input.trim()) {
+                    return 'Seed phrase cannot be empty';
+                  }
+                  return true;
+                }
+              }
+            ]);
+            
+            try {
+              accountAddress = await validateSeedPhrase(seedInput);
+              seedPhrase = seedInput;
+              valid = true;
+              console.log(`✅ Validated seed phrase with address ${accountAddress}`);
+            } catch (error) {
+              console.error(`❌ Invalid seed phrase: ${error.message}`);
+            }
+          }
         }
-      ]);
-
-      // Reset for retry
-      neynarApiKey = null;
-      neynarClientId = null;
-
-      if (!retry) {
-        useNeynar = false;
-        break;
+      } else {
+        // No existing seed phrase, ask for a new one
+        let valid = false;
+        while (!valid) {
+          const { seedInput } = await inquirer.prompt([
+            {
+              type: 'password',
+              name: 'seedInput',
+              message: 'Enter your seed phrase (12 or 24 words):',
+              validate: (input) => {
+                if (!input.trim()) {
+                  return 'Seed phrase cannot be empty';
+                }
+                return true;
+              }
+            }
+          ]);
+          
+          try {
+            accountAddress = await validateSeedPhrase(seedInput);
+            seedPhrase = seedInput;
+            valid = true;
+            console.log(`✅ Validated seed phrase with address ${accountAddress}`);
+          } catch (error) {
+            console.error(`❌ Invalid seed phrase: ${error.message}`);
+          }
+        }
       }
     }
 
-    // Get seed phrase from user
-    let seedPhrase = process.env.SEED_PHRASE;
-    if (!seedPhrase) {
-      const { seedPhrase: inputSeedPhrase } = await inquirer.prompt([
+    // Custom webhook URL option
+    const { customWebhook } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'customWebhook',
+        message: 'Do you want to specify a custom webhook URL for frame actions?',
+        default: false
+      }
+    ]);
+
+    let webhookUrl;
+    if (customWebhook) {
+      const { webhook } = await inquirer.prompt([
         {
-          type: 'password',
-          name: 'seedPhrase',
-          message: 'Your farcaster custody account seed phrase is required to create a signature proving this app was created by you.\n' +
-          `⚠️ ${yellow}${italic}seed phrase is only used to sign the frame manifest, then discarded${reset} ⚠️\n` +
-          'Seed phrase:',
-          validate: async (input) => {
+          type: 'input',
+          name: 'webhook',
+          message: 'Enter your webhook URL:',
+          validate: (input) => {
             try {
-              await validateSeedPhrase(input);
+              new URL(input);
               return true;
             } catch (error) {
-              return error.message;
+              return 'Please enter a valid URL';
             }
           }
         }
       ]);
-      seedPhrase = inputSeedPhrase;
+      webhookUrl = webhook;
     } else {
-      console.log('Using existing seed phrase from .env');
+      webhookUrl = null;
     }
 
-    // Validate seed phrase and get account address
-    const accountAddress = await validateSeedPhrase(seedPhrase);
-    console.log('✅ Generated account address from seed phrase');
+    // Generate Farcaster metadata
+    let farcasterMetadata = null;
+    if (seedPhrase && accountAddress) {
+      farcasterMetadata = await generateFarcasterMetadata(domain, accountAddress, seedPhrase, webhookUrl);
+      console.log('✅ Generated frame metadata');
+    }
 
-    const fid = await lookupFidByCustodyAddress(accountAddress, neynarApiKey ?? 'FARCASTER_V2_FRAMES_DEMO');
+    // Write out the metadata file
+    const metadataPath = 'farcaster.json';
+    fs.writeFileSync(metadataPath, JSON.stringify(farcasterMetadata, null, 2));
+    console.log(`✅ Wrote metadata to ${metadataPath}`);
 
-    // Generate and sign manifest
-    console.log('\n🔨 Generating frame manifest...');
-    
-    // Determine webhook URL based on environment variables
-    const webhookUrl = neynarApiKey && neynarClientId 
-      ? `https://api.neynar.com/f/app/${neynarClientId}/event`
-      : `${domain}/api/webhook`;
-
-    const metadata = await generateFarcasterMetadata(domain, fid, accountAddress, seedPhrase, webhookUrl);
-    console.log('\n✅ Frame manifest generated' + (seedPhrase ? ' and signed' : ''));
-
-    // Read existing .env file or create new one
-    const envPath = path.join(projectRoot, '.env');
-    let envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
-
-    // Add or update environment variables
-    const newEnvVars = [
-      // Base URL
-      `NEXT_PUBLIC_URL=https://${domain}`,
-
-      // Frame metadata
+    // Update .env file
+    const envVars = [
+      // App URL
+      `NEXT_PUBLIC_URL="https://${domain}"`,
+      // Frame info
       `NEXT_PUBLIC_FRAME_NAME="${frameName}"`,
-      `NEXT_PUBLIC_FRAME_DESCRIPTION="${process.env.NEXT_PUBLIC_FRAME_DESCRIPTION || ''}"`,
       `NEXT_PUBLIC_FRAME_BUTTON_TEXT="${buttonText}"`,
-
-      // Neynar configuration (if it exists in current env)
-      ...(process.env.NEYNAR_API_KEY ? 
-        [`NEYNAR_API_KEY="${process.env.NEYNAR_API_KEY}"`] : []),
-      ...(neynarClientId ? 
-        [`NEYNAR_CLIENT_ID="${neynarClientId}"`] : []),
-
-      // FID (if it exists in current env)
-      ...(process.env.FID ? [`FID="${process.env.FID}"`] : []),
-
-      // NextAuth configuration
-      `NEXTAUTH_SECRET="${process.env.NEXTAUTH_SECRET || crypto.randomBytes(32).toString('hex')}"`,
-      `NEXTAUTH_URL="https://${domain}"`,
-
-      // Frame manifest with signature
-      `FRAME_METADATA=${JSON.stringify(metadata)}`,
+      // Warpcast configuration (to enable hub sync in v2)
+      `NEXT_PUBLIC_FRAME_HUB_SYNC=true`
     ];
 
-    // Filter out empty values and join with newlines
-    const validEnvVars = newEnvVars.filter(line => {
-      const [, value] = line.split('=');
-      return value && value !== '""';
-    });
-
-    // Update or append each environment variable
-    validEnvVars.forEach(varLine => {
-      const [key] = varLine.split('=');
-      if (envContent.includes(`${key}=`)) {
-        envContent = envContent.replace(new RegExp(`${key}=.*`), varLine);
+    // Add seed phrase to local config, not pushed to git
+    if (seedPhrase) {
+      // Update/create .env.local with the seed phrase for local development
+      let localEnvContent = fs.existsSync('.env.local') 
+        ? fs.readFileSync('.env.local', 'utf8') 
+        : '';
+      
+      if (!localEnvContent.includes('SEED_PHRASE=')) {
+        localEnvContent += `\nSEED_PHRASE="${seedPhrase}"\n`;
       } else {
-        envContent += `\n${varLine}`;
+        // Replace existing seed phrase
+        localEnvContent = localEnvContent.replace(
+          /SEED_PHRASE=.*/,
+          `SEED_PHRASE="${seedPhrase}"`
+        );
       }
-    });
+      
+      fs.writeFileSync('.env.local', localEnvContent);
+      console.log('✅ Updated .env.local with seed phrase');
+    }
 
     // Write updated .env file
-    fs.writeFileSync(envPath, envContent);
+    fs.writeFileSync('.env', envVars.join('\n') + '\n');
+    console.log('✅ Updated .env file');
 
-    console.log('\n✅ Environment variables updated');
+    // Build the project
+    console.log('\n🔨 Building your project...');
+    execSync('npm run build', { stdio: 'inherit' });
+    console.log('✅ Build completed');
 
-    // Run next build
-    console.log('\nBuilding Next.js application...');
-    execSync('next build', { cwd: projectRoot, stdio: 'inherit' });
+    console.log(`
+🎉 Your frame is ready to be deployed!
 
-    console.log('\n✨ Build complete! Your frame is ready for deployment. 🪐');
-    console.log('📝 Make sure to configure the environment variables from .env in your hosting provider');
+To deploy it:
+- If you already have vercel set up: Run 'npm run deploy:vercel'
+- For a custom host, make sure to:
+  1. Deploy the entire project
+  2. Set the environment variables from .env in your hosting provider
+  3. If you're using your own custom domain, make sure it matches the one you configured: ${domain}
+`);
 
   } catch (error) {
-    console.error('\n❌ Error:', error.message);
+    console.error('❌ Error building the project:', error);
     process.exit(1);
   }
 }
 
-main();
+main().catch(console.error);
