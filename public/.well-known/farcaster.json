@@ -7,6 +7,7 @@
   "frame": {
     "version": "1",
     "name": "VisionZ Retro",
+    "iconUrl": "https://visionz-mini.vercel.app/logo.png",
     "imageUrl": "https://visionz-mini.vercel.app/opengraph-image.png",
     "buttonTitle": "Create Vision",
     "homeUrl": "https://visionz-mini.vercel.app",

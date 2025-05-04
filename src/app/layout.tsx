@@ -8,7 +8,8 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const baseUrl = process.env.NEXT_PUBLIC_URL || 'https://visionz-mini.vercel.app';
+  // Ensure URL doesn't end with a slash to avoid double slashes
+  const baseUrl = (process.env.NEXT_PUBLIC_URL || 'https://visionz-mini.vercel.app').replace(/\/$/, '');
   
   return (
     <html lang="en">
@@ -22,6 +23,12 @@ export default function RootLayout({
         <meta property="og:title" content="VisionZ Retro" />
         <meta property="og:description" content="Create retro-style tokens on Base" />
         <meta property="og:image" content={`${baseUrl}/opengraph-image.png`} />
+        
+        {/* Twitter Meta Tags */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="VisionZ Retro" />
+        <meta name="twitter:description" content="Create retro-style tokens on Base" />
+        <meta name="twitter:image" content={`${baseUrl}/opengraph-image.png`} />
         
         {/* Farcaster Frame Meta Tags */}
         <meta name="fc:frame" content="vNext" />

@@ -2,40 +2,29 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
   try {
+    // Request gövdesini parse et
     const body = await req.json();
-    
-    // Log the webhook event
-    console.log('Received Farcaster webhook:', body);
-    
-    // Handle different event types
+    console.log('Webhook event received:', body);
+
+    // Olayı işle
     if (body.event === 'frame_added') {
-      // User added your Mini App
-      console.log('User added the Mini App', body.notificationDetails);
-      // Store the notification token in your database
+      console.log('Frame added event received with notification token:', body.notificationDetails?.token);
+      // TODO: Token'ı veritabanına kaydet
+    } else if (body.event === 'frame_removed') {
+      console.log('Frame removed event received');
+      // TODO: Token'ı sil veya devre dışı bırak
+    } else if (body.event === 'notifications_enabled') {
+      console.log('Notifications enabled event received with token:', body.notificationDetails?.token);
+      // TODO: Bildirim token'ını etkinleştir
+    } else if (body.event === 'notifications_disabled') {
+      console.log('Notifications disabled event received');
+      // TODO: Bildirim token'ını devre dışı bırak
     }
-    else if (body.event === 'frame_removed') {
-      // User removed your Mini App
-      console.log('User removed the Mini App');
-      // Remove notification tokens for this user
-    }
-    else if (body.event === 'notifications_enabled') {
-      // User enabled notifications
-      console.log('User enabled notifications', body.notificationDetails);
-      // Store/update the notification token
-    }
-    else if (body.event === 'notifications_disabled') {
-      // User disabled notifications
-      console.log('User disabled notifications');
-      // Mark tokens as invalid in your database
-    }
-    
+
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error processing webhook:', error);
-    return NextResponse.json(
-      { error: 'Failed to process webhook' },
-      { status: 500 }
-    );
+    console.error('Error in webhook endpoint:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
 
