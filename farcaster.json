@@ -1,17 +1,21 @@
 {
-  "accountAssociation": {
-    "header": "eyJmaWQiOjg2NDc5MywidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweENjZTJFMjI5NzNmMUY1MTA5MjQzQTZiNkREZTdBNDk4QzlENjYzNjYifQ",
-    "payload": "eyJkb21haW4iOiJ0YXgtdXN1YWxseS1hdXN0aW4tbGlzdGVuaW5nLnRyeWNsb3VkZmxhcmUuY29tIn0",
-    "signature": "MHhjODJhODNhMDhlYzhkMmNmZWJiMjRhNGZlMmUyOWRlNTY5OGU2NjYwYzEyMDA4MzQ4NTQxMmZlNjJlOGJjOGYyNzY0YTg0OWVmMWYxZmI0YjIzYmY2MDcxMzZkYjEzNDdkMWNkMjMyMzVhZTg1ZGJmZDZjODRhMzlhMDhkY2I4NDFj"
-  },
   "frame": {
     "version": "1",
     "name": "8BitMinter",
+    "description": "Create and mint your own 8-bit style tokens on the blockchain.",
     "imageUrl": "https://8bitminter.vercel.app/opengraph-image.png",
     "buttonTitle": "Create Token",
     "homeUrl": "https://8bitminter.vercel.app",
+    "iconUrl": "https://8bitminter.vercel.app/logo.png",
     "splashImageUrl": "https://8bitminter.vercel.app/logo.png",
-    "splashBackgroundColor": "#000000",
-    "webhookUrl": "https://8bitminter.vercel.app/api/webhook"
+    "splashBackgroundColor": "#181028",
+    "primaryCategory": "creation",
+    "tags": ["nft", "tokens", "blockchain", "web3", "8bit", "retro"],
+    "screenshotUrls": [
+      "https://8bitminter.vercel.app/images/screenshot1.png"
+    ],
+    "ogTitle": "8BitMinter",
+    "ogDescription": "Create retro-styled tokens on the blockchain with AI-generated art",
+    "ogImageUrl": "https://8bitminter.vercel.app/opengraph-image.png"
   }
 }

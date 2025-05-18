@@ -1,25 +1,6 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-interface FrameMetadata {
-  accountAssociation?: {
-    header: string;
-    payload: string;
-    signature: string;
-  };
-  frame: {
-    version: string;
-    name: string;
-    iconUrl: string;
-    homeUrl: string;
-    imageUrl: string;
-    buttonTitle: string;
-    splashImageUrl: string;
-    splashBackgroundColor: string;
-    webhookUrl: string;
-  };
-}
-
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -35,26 +16,48 @@ export function getSecretEnvVars() {
   return { seedPhrase, fid };
 }
 
-export async function getFarcasterMetadata(): Promise<FrameMetadata> {
-  // Return the exact same content as the static file
-  return {
-    accountAssociation: {
-      header: "eyJmaWQiOjg2NDc5MywidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweENjZTJFMjI5NzNmMUY1MTA5MjQzQTZiNkREZTdBNDk4QzlENjYzNjYifQ",
-      payload: "eyJkb21haW4iOiJ0YXgtdXN1YWxseS1hdXN0aW4tbGlzdGVuaW5nLnRyeWNsb3VkZmxhcmUuY29tIn0",
-      signature: "MHhjODJhODNhMDhlYzhkMmNmZWJiMjRhNGZlMmUyOWRlNTY5OGU2NjYwYzEyMDA4MzQ4NTQxMmZlNjJlOGJjOGYyNzY0YTg0OWVmMWYxZmI0YjIzYmY2MDcxMzZkYjEzNDdkMWNkMjMyMzVhZTg1ZGJmZDZjODRhMzlhMDhkY2I4NDFj"
-    },
-    frame: {
-      version: "1",
-      name: "8BitMinter",
-      iconUrl: `${process.env.NEXT_PUBLIC_URL || 'https://8bitminter.vercel.app'}/logo.png`,
-      imageUrl: `${process.env.NEXT_PUBLIC_URL || 'https://8bitminter.vercel.app'}/opengraph-image.png`,
-      buttonTitle: "Create Token",
-      homeUrl: process.env.NEXT_PUBLIC_URL || 'https://8bitminter.vercel.app',
-      splashImageUrl: `${process.env.NEXT_PUBLIC_URL || 'https://8bitminter.vercel.app'}/logo.png`,
-      splashBackgroundColor: "#000000",
-      webhookUrl: `${process.env.NEXT_PUBLIC_URL || 'https://8bitminter.vercel.app'}/api/webhook`
-    },
-  };
+/**
+ * Utility to check if code is running in a Farcaster Mini App environment
+ */
+export function isFarcasterMiniApp(): boolean {
+  if (typeof window === 'undefined') return false;
+  
+  // Check for Farcaster SDK
+  if (window.farcaster) return true;
+  
+  // Check for common Farcaster environment indicators
+  const userAgent = window.navigator.userAgent.toLowerCase();
+  return userAgent.includes('farcaster') || 
+         userAgent.includes('warpcast') || 
+         window.parent !== window;
+}
+
+/**
+ * Call the Farcaster SDK ready function to dismiss splash screen
+ */
+export async function dismissFarcasterSplash(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    // Try the import from SDK first
+    const { sdk } = await import('@farcaster/frame-sdk');
+    if (sdk && sdk.actions && sdk.actions.ready) {
+      await sdk.actions.ready();
+      console.log("Farcaster splash screen dismissed with SDK");
+      return;
+    }
+    
+    // Fallback to window.farcaster
+    if (window.farcaster && window.farcaster.actions && window.farcaster.actions.ready) {
+      await window.farcaster.actions.ready();
+      console.log("Farcaster splash screen dismissed with window.farcaster");
+      return;
+    }
+    
+    console.log("Not in Farcaster environment, no splash to dismiss");
+  } catch (error) {
+    console.error("Error dismissing Farcaster splash:", error);
+  }
 }
 
 

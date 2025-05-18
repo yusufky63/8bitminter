@@ -3,6 +3,7 @@ import { RetroStepScreen } from "./RetroStepScreen";
 import { RetroDivider } from "./RetroDivider";
 import { RetroButton } from "./ui/RetroButton";
 import { toast } from "react-hot-toast";
+import Image from "next/image";
 
 interface RetroImageGenProps {
   name: string;
@@ -163,10 +164,13 @@ export function RetroImageGen({
         <div className="flex flex-col items-center mb-4">
           {(displayImageUrl || localDisplayUrl) ? (
             <div className="relative w-48 h-48 mb-4 overflow-hidden border-4 border-retro-primary">
-              <img
+              <Image
                 src={localDisplayUrl || displayImageUrl}
                 alt="Token"
+                width={192}
+                height={192}
                 className="w-full h-full object-cover pixelated"
+                unoptimized={true}
               />
               <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-xs text-retro-accent p-1 text-center">
                 IPFS Ready

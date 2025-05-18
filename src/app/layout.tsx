@@ -15,12 +15,14 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <title>8BitMinter</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <meta
           name="description"
           content="Create retro-styled tokens on the blockchain with AI-generated art"
         />
         <link rel="icon" href="/logo.png" />
-        <meta name="theme-color" content="#6366F1" />
+        <meta name="theme-color" content="#181028" />
+        <link rel="manifest" href="/manifest.json" />
         
         {/* OpenGraph Meta Tags */}
         <meta property="og:title" content="8BitMinter" />
@@ -29,6 +31,8 @@ export default function RootLayout({
           content="Create retro-styled tokens on the blockchain with AI-generated art"
         />
         <meta property="og:image" content={`${baseUrl}/opengraph-image.png`} />
+        <meta property="og:url" content={baseUrl} />
+        <meta property="og:type" content="website" />
         
         {/* Twitter Meta Tags */}
         <meta name="twitter:card" content="summary_large_image" />
@@ -36,11 +40,14 @@ export default function RootLayout({
         <meta name="twitter:description" content="Create retro-style tokens on Base" />
         <meta name="twitter:image" content={`${baseUrl}/opengraph-image.png`} />
         
-        {/* Farcaster Frame Meta Tags */}
+        {/* Farcaster Frame configuration */}
         <meta name="fc:frame" content="vNext" />
         <meta name="fc:frame:image" content={`${baseUrl}/opengraph-image.png`} />
         <meta name="fc:frame:button:1" content="Create Token" />
-        <meta name="fc:frame:post_url" content={`${baseUrl}/api/frame`} />
+
+        {/* Farcaster Mini App specific META tags - Doğrudan dokümantasyondaki formata uygun */}
+        <meta name="miniapp:splash:background" content="#181028" />
+        <meta name="miniapp:splash:image" content={`${baseUrl}/logo.png`} />
       </head>
       <body>
         <Providers>

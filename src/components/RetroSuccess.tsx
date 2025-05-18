@@ -31,11 +31,11 @@ export function RetroSuccess({
     window.open(`https://zora.co/coin/${contractAddress}`, '_blank');
   };
 
-  // Go to Hold page to view the token
-  const goToHoldTab = () => {
-    // Find the header component and trigger tab change to "hold"
+  // Go to coin details page
+  const goToCoinDetails = () => {
+    // Find the header component and trigger tab change to "explore"
     if (typeof window !== 'undefined') {
-      // Add the contract to local storage so the Hold tab can show it
+      // Add the contract to local storage so the Explore tab can show it
       try {
         // Get existing watched tokens or initialize empty array
         const watchedTokens = JSON.parse(localStorage.getItem('watchedTokens') || '[]');
@@ -53,21 +53,21 @@ export function RetroSuccess({
           localStorage.setItem('watchedTokens', JSON.stringify(watchedTokens));
         }
         
-        // Find RetroHeader and trigger tab change to "hold"
+        // Find RetroHeader and trigger tab change to "explore" with the contract address
         const changeTabEvent = new CustomEvent('changeTab', { 
-          detail: { tab: 'hold' } 
+          detail: { tab: 'explore', contractAddress } 
         });
         window.dispatchEvent(changeTabEvent);
         
-        // Navigate to root with hash for hold tab
-        window.location.href = "/#hold";
+        // Navigate to coin details
+        window.location.href = `/#explore/${contractAddress}`;
         
         // Reload the page to ensure tab change
         setTimeout(() => window.location.reload(), 100);
       } catch (error) {
         console.error("Failed to save token to localStorage:", error);
         // Fallback - just try to change tab
-        window.location.href = "/#hold";
+        window.location.href = `/#explore/${contractAddress}`;
       }
     }
   };
@@ -144,6 +144,7 @@ export function RetroSuccess({
                 width={96}
                 height={96}
                 className="w-full h-full object-cover pixelated"
+                unoptimized={true}
               />
             </div>
           </div>
@@ -186,13 +187,14 @@ export function RetroSuccess({
         </RetroButton>
         
         <RetroButton
-          onClick={goToHoldTab}
+          onClick={goToCoinDetails}
           fullWidth
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter" className="mr-2">
-            <path d="M12 1v22M1 12h22M4.93 4.93l14.14 14.14M4.93 19.07l14.14-14.14"></path>
+            <path d="M23 12l-7-7v4H8v6h8v4l7-7z"></path>
+            <path d="M1 5v14h15"></path>
           </svg>
-          HOLD
+          TRADE
         </RetroButton>
       </div>
     </RetroStepScreen>
