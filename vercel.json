@@ -1,6 +1,10 @@
 {
+  "version": 2,
   "buildCommand": "next build",
   "framework": "nextjs",
+  "rewrites": [
+    { "source": "/.well-known/farcaster.json", "destination": "/api/farcaster.json" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -10,20 +14,12 @@
           "value": "*"
         },
         {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET, POST, PUT, DELETE, OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "X-Requested-With, Content-Type, Accept"
-        },
-        {
           "key": "X-Frame-Options",
-          "value": "ALLOW-FROM https://warpcast.com"
+          "value": "ALLOWALL"
         },
         {
           "key": "Content-Security-Policy",
-          "value": "frame-ancestors 'self' https://warpcast.com https://*.warpcast.com"
+          "value": "frame-ancestors *"
         }
       ]
     }

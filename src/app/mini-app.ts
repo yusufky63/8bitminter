@@ -3,38 +3,159 @@
 import { sdk } from "@farcaster/frame-sdk";
 
 /**
- * Bu dosya Warpcast dokümantasyonuna göre Mini App entegrasyonu içindir.
- * @see https://miniapps.farcaster.xyz/docs/guides/loading
+ * This file handles Farcaster Mini App integration
+ * @see https://docs.farcaster.xyz/reference/frames/spec
  */
 
+export type FrameContext = {
+  user: {
+    fid: number;
+    username?: string;
+    displayName?: string;
+    pfpUrl?: string;
+  };
+  location?: FrameLocationContext;
+  client: {
+    clientFid: number;
+    added: boolean;
+    safeAreaInsets?: SafeAreaInsets;
+    notificationDetails?: FrameNotificationDetails;
+  };
+};
+
+export type FrameLocationContext =
+  | CastEmbedLocationContext
+  | NotificationLocationContext
+  | LauncherLocationContext
+  | ChannelLocationContext;
+
+export type CastEmbedLocationContext = {
+  type: 'cast_embed';
+  embed: string;
+  cast: {
+    fid: number;
+    hash: string;
+  };
+};
+
+export type NotificationLocationContext = {
+  type: 'notification';
+  notification: {
+    notificationId: string;
+    title: string;
+    body: string;
+  };
+};
+
+export type LauncherLocationContext = {
+  type: 'launcher';
+};
+
+export type ChannelLocationContext = {
+  type: 'channel';
+  channel: {
+    key: string;
+    name: string;
+    imageUrl?: string;
+  };
+};
+
+export type SafeAreaInsets = {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+};
+
+export type FrameNotificationDetails = {
+  url: string;
+  token: string;
+};
+
 /**
- * Mini App'in hazır olduğunu bildir ve splash screen'i kapat
+ * Indicates that the Mini App is ready and hides the splash screen
  */
 export async function dismissSplashScreen() {
   try {
-    // Dokümanda belirtildiği şekilde:
+    console.log("Dismissing splash screen...");
     await sdk.actions.ready();
+    console.log("Splash screen dismissed.");
   } catch (error) {
-    console.error("Error calling ready method:", error);
+    console.error("Error dismissing splash screen:", error);
   }
 }
 
 /**
- * Farcaster Mini App'in global olarak kullanılabilir olup olmadığını kontrol et
+ * Checks if the app is running in a Farcaster Mini App context
  */
-export function isFarcasterMiniApp(): boolean {
+export async function isFarcasterMiniApp(): Promise<boolean> {
   if (typeof window === "undefined") return false;
   
-  return !!(window.farcaster || 
-    (typeof sdk !== "undefined" && sdk.actions && sdk.actions.ready));
+  try {
+    return await sdk.isInMiniApp();
+  } catch (error) {
+    console.error("Error checking if in mini app:", error);
+    return false;
+  }
 }
 
 /**
- * Mini App'i başlatma kodu
+ * Gets Farcaster context information including user, location and client details
  */
-export function initializeFarcaster() {
-  if (typeof window === "undefined") return;
+export async function getFarcasterContext(): Promise<FrameContext | null> {
+  try {
+    if (!(await isFarcasterMiniApp())) {
+      return null;
+    }
+    
+    const contextData = await sdk.context;
+    return contextData as FrameContext;
+  } catch (error) {
+    console.error("Error getting Farcaster context:", error);
+    return null;
+  }
+}
+
+/**
+ * Initializes the Farcaster app
+ */
+export async function initializeFarcaster() {
+  if (!(await isFarcasterMiniApp())) {
+    console.log("Not running in a Farcaster Mini App context");
+    return null;
+  }
+
+  // Dismiss splash screen after a short delay
+  await dismissSplashScreen();
   
-  // Dokümantasyon: Interface hazır olduğunda çağırın
-  dismissSplashScreen();
+  // Get context information
+  const context = await getFarcasterContext();
+  console.log("Farcaster context:", context);
+  
+  return context;
+}
+
+// Helper to test manifest access
+export async function testManifestAccess() {
+  console.log("Testing manifest access...");
+  
+  // Test all possible paths
+  const paths = [
+    '/.well-known/farcaster.json',
+    '/api/farcaster.json',
+    '/farcaster.json'
+  ];
+  
+  for (const path of paths) {
+    try {
+      const response = await fetch(path);
+      console.log(`Manifest access (${path}):`, response.status, response.statusText);
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`Manifest content (${path}):`, data);
+      }
+    } catch (err) {
+      console.error(`Error accessing manifest (${path}):`, err);
+    }
+  }
 } 

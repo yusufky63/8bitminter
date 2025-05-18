@@ -21,32 +21,37 @@ const nextConfig = {
       },
     ],
   },
-  // Add headers for Farcaster mini app
+  // Minimalize configurations to avoid conflicts
   async headers() {
     return [
       {
-        source: '/(.*)',
+        source: '/.well-known/(.*)',
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
             value: '*',
+          }
+        ],
+      },
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'ALLOWALL',
           },
           {
-            key: 'Access-Control-Allow-Methods',
-            value: 'GET, POST, PUT, DELETE, OPTIONS',
-          },
-          {
-            key: 'Access-Control-Allow-Headers',
-            value: 'X-Requested-With, Content-Type, Accept',
+            key: 'Content-Security-Policy',
+            value: "frame-ancestors *",
           },
         ],
       },
     ];
   },
+  // Re-add rewrites to ensure .well-known path works
   async rewrites() {
     return [
       {
-        // Rewrite for the Farcaster .well-known directory
         source: '/.well-known/farcaster.json',
         destination: '/api/farcaster.json',
       },

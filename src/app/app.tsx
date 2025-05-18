@@ -53,8 +53,15 @@ const CoinExplorer = dynamic(
   { ssr: false, loading: () => <LoadingComponent /> }
 );
 
+// App component props
+interface AppProps {
+  isMiniApp?: boolean;
+  userName?: string;
+  userFid?: number;
+}
+
 // Top level app component
-export default function App() {
+export default function App({ isMiniApp = false, userName = 'User', userFid }: AppProps) {
   const [isClient, setIsClient] = useState(false);
   const [activeTab, setActiveTab] = useState("create");
   const [isLoading, setIsLoading] = useState(true);
@@ -63,6 +70,10 @@ export default function App() {
   useEffect(() => {
     setIsClient(true);
     console.log('[APP] App component mounted, client-side rendering enabled');
+    
+    if (isMiniApp) {
+      console.log(`[APP] Running in Farcaster Mini App context for user: ${userName} (FID: ${userFid})`);
+    }
     
     // Delay setting isLoading to false to prevent flickering
     const timer = setTimeout(() => {
@@ -86,7 +97,7 @@ export default function App() {
     }
     
     return () => clearTimeout(timer);
-  }, []);
+  }, [isMiniApp, userName, userFid]);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -119,7 +130,11 @@ export default function App() {
     <NoSSR>
       <main className="bg-retro-darker min-h-screen py-2 retro-scanline">
         <div className="mx-auto max-w-2xl px-2">
-          <RetroHeader activeTab={activeTab} onTabChange={handleTabChange} />
+          <RetroHeader 
+            activeTab={activeTab} 
+            onTabChange={handleTabChange} 
+            userName={isMiniApp ? userName : undefined}
+          />
           <div className="container mx-auto">
             {renderContent()}
           </div>

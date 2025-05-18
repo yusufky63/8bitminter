@@ -1,0 +1,22 @@
+{
+  "accountAssociation": {
+    "header": "eyJmaWQiOjAsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoieW91ci1wdWJsaWMta2V5In0=",
+    "payload": "eyJkb21haW4iOiI4Yml0bWludGVyLnZlcmNlbC5hcHAifQ==",
+    "signature": "your-signature"
+  },
+  "frame": {
+    "version": "next",
+    "name": "8BitMinter",
+    "iconUrl": "/logo.png",
+    "homeUrl": "https://8bitminter.vercel.app",
+    "splashImageUrl": "/logo.png",
+    "splashBackgroundColor": "#181028",
+    "primaryCategory": "art-creativity",
+    "description": "Create and mint your own 8-bit style tokens on the blockchain.",
+    "tags": ["nft", "tokens", "blockchain", "web3", "8bit"],
+    "screenshotUrls": [
+      "/images/screenshot1.png"
+    ],
+    "webhookUrl": "https://8bitminter.vercel.app/api/webhook"
+  }
+} 

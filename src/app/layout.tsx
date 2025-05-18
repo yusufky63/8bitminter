@@ -1,7 +1,10 @@
+"use client";
+
 import "./globals.css";
 import "@fontsource/press-start-2p";
 import "@fontsource/vt323";
 import Providers from "./providers";
+import { useEffect, useState } from "react";
 
 export default function RootLayout({
   children,
@@ -9,7 +12,30 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   // Ensure URL doesn't end with a slash to avoid double slashes
-  const baseUrl = (process.env.NEXT_PUBLIC_URL || 'https://8bitminter.vercel.app').replace(/\/$/, '');
+  const [baseUrl, setBaseUrl] = useState('https://8bitminter.vercel.app');
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const url = (process.env.NEXT_PUBLIC_URL || window.location.origin).replace(/\/$/, '');
+      setBaseUrl(url);
+    }
+  }, []);
+  
+  // Define the Farcaster frame JSON
+  const frameJson = {
+    version: "next",
+    imageUrl: `${baseUrl}/opengraph-image.png`,
+    button: {
+      title: "Start Minting",
+      action: {
+        type: "launch_frame",
+        name: "8BitMinter",
+        url: baseUrl,
+        splashImageUrl: `${baseUrl}/logo.png`,
+        splashBackgroundColor: "#181028"
+      }
+    }
+  };
   
   return (
     <html lang="en">
@@ -41,19 +67,13 @@ export default function RootLayout({
         <meta name="twitter:image" content={`${baseUrl}/opengraph-image.png`} />
         
         {/* Farcaster Frame configuration */}
-        <meta name="fc:frame" content="vNext" />
+        <meta name="fc:frame" content={JSON.stringify(frameJson)} />
         <meta name="fc:frame:image" content={`${baseUrl}/opengraph-image.png`} />
+        <meta name="fc:frame:button:1" content="Start Minting" />
 
-        {/* Farcaster Mini App configuration */}
-        <meta name="miniapp:name" content="8BitMinter" />
-        <meta name="miniapp:url" content={baseUrl} />
-        <meta name="miniapp:platform" content="farcaster" />
-        <meta name="miniapp:splash:background" content="#181028" />
-        <meta name="miniapp:splash:image" content={`${baseUrl}/logo.png`} />
-        
-        {/* X-Frame-Options - Allow embedding from Warpcast */}
-        <meta httpEquiv="X-Frame-Options" content="ALLOW-FROM https://warpcast.com" />
-        <meta httpEquiv="Content-Security-Policy" content="frame-ancestors 'self' https://warpcast.com https://*.warpcast.com" />
+        {/* Allow embedding from anywhere */}
+        <meta httpEquiv="X-Frame-Options" content="ALLOWALL" />
+        <meta httpEquiv="Content-Security-Policy" content="frame-ancestors *" />
       </head>
       <body>
         <Providers>
