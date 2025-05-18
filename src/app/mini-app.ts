@@ -94,8 +94,8 @@ export async function isFarcasterMiniApp(): Promise<boolean> {
   
   try {
     // Check if the app is running in a mini app context
-    // Pass a timeout of 100ms as per documentation
-    return await (sdk as any).isInMiniApp(100);
+    // Using type assertion as SDK types might be behind implementation
+    return await (sdk as any).isInMiniApp();
   } catch (error) {
     console.error("Error checking if in mini app:", error);
     return false;
