@@ -19,5 +19,22 @@
   "theme_color": "#181028",
   "background_color": "#181028",
   "orientation": "portrait",
-  "scope": "/"
+  "scope": "/",
+  "miniapp": {
+    "name": "8BitMinter",
+    "description": "Create and mint your own 8-bit style tokens on the blockchain.",
+    "icon": "/logo.png",
+    "platforms": ["farcaster"],
+    "categories": ["creation"],
+    "author": {
+      "name": "8BitMinter Team"
+    },
+    "splash": {
+      "background": "#181028",
+      "image": "/logo.png"
+    },
+    "primaryColor": "#181028",
+    "tags": ["nft", "tokens", "blockchain", "web3", "8bit", "retro"],
+    "permissions": []
+  }
 } 

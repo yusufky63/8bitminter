@@ -45,9 +45,16 @@ export default function RootLayout({
         <meta name="fc:frame:image" content={`${baseUrl}/opengraph-image.png`} />
         <meta name="fc:frame:button:1" content="Create Token" />
 
-        {/* Farcaster Mini App specific META tags - Doğrudan dokümantasyondaki formata uygun */}
+        {/* Farcaster Mini App configuration */}
+        <meta name="miniapp:name" content="8BitMinter" />
+        <meta name="miniapp:url" content={baseUrl} />
+        <meta name="miniapp:platform" content="farcaster" />
         <meta name="miniapp:splash:background" content="#181028" />
         <meta name="miniapp:splash:image" content={`${baseUrl}/logo.png`} />
+        
+        {/* X-Frame-Options - Allow embedding from Warpcast */}
+        <meta httpEquiv="X-Frame-Options" content="ALLOW-FROM https://warpcast.com" />
+        <meta httpEquiv="Content-Security-Policy" content="frame-ancestors 'self' https://warpcast.com https://*.warpcast.com" />
       </head>
       <body>
         <Providers>

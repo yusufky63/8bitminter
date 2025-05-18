@@ -13,6 +13,13 @@ const nextConfig = {
   },
   images: {
     domains: ['api.together.ai', 'ipfs.io'],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "raw.githubusercontent.com",
+        pathname: "/**",
+      },
+    ],
   },
   // Add headers for Farcaster mini app
   async headers() {
@@ -36,6 +43,15 @@ const nextConfig = {
       },
     ];
   },
+  async rewrites() {
+    return [
+      {
+        // Rewrite for the Farcaster .well-known directory
+        source: '/.well-known/farcaster.json',
+        destination: '/api/farcaster.json',
+      },
+    ];
+  },
 };
 
-export default nextConfig; 
+export default nextConfig;
