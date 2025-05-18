@@ -6,9 +6,9 @@ export async function GET() {
   // Build the manifest in the official format
   const manifest = {
     accountAssociation: {
-      header: "eyJmaWQiOjAsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoieW91ci1wdWJsaWMta2V5In0=",
-      payload: "eyJkb21haW4iOiI4Yml0bWludGVyLnZlcmNlbC5hcHAifQ==",
-      signature: "your-signature"
+      header: "",
+      payload: "",
+      signature: ""
     },
     frame: {
       version: "next",
