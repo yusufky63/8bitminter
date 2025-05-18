@@ -3,7 +3,8 @@
   "buildCommand": "next build",
   "framework": "nextjs",
   "rewrites": [
-    { "source": "/.well-known/farcaster.json", "destination": "/api/farcaster.json" }
+    { "source": "/.well-known/farcaster.json", "destination": "/api/farcaster.json" },
+    { "source": "/.well-known/farcaster/manifest.json", "destination": "/api/farcaster-manifest" }
   ],
   "headers": [
     {
@@ -20,6 +21,10 @@
         {
           "key": "Content-Security-Policy",
           "value": "frame-ancestors *"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "s-maxage=1, stale-while-revalidate"
         }
       ]
     }
