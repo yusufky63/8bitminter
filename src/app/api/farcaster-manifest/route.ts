@@ -10,13 +10,12 @@ export async function GET() {
       "payload": "eyJkb21haW4iOiI4Yml0bWludGVyLnZlcmNlbC5hcHAifQ",
       "signature": "MHhkMTIzZDUwNDZkZDE5MjlhMmNiMzMyM2FiM2M4Y2M5OTdiMWVjMjZjMjgxODM5Yzg3YmUxZTJlYzBhMDA0Mzg5NzE5NmYxMjlhMWI5OTA0NzA3MzU3MDlhMWUwMjk1YTIxMjU1OTNlYTE5MWFmYjhmMzI3MzAwZGY4NTg1YWY3MjFi"
     },
-    miniApp: {
+    frame: {
       version: "1",
       name: "8BitMinter",
-      description: "Create retro-styled tokens on the blockchain with AI-generated art",
+      description: "Create and mint your own 8-bit style tokens on the blockchain.",
       iconUrl: `${appUrl}/logo.png`,
       homeUrl: appUrl,
-      installUrl: appUrl,
       splashImageUrl: `${appUrl}/logo.png`,
       splashBackgroundColor: "#181028",
       primaryCategory: "art-creativity",
@@ -24,10 +23,7 @@ export async function GET() {
       screenshotUrls: [
         `${appUrl}/images/screenshot1.png`
       ],
-      permissions: [],
-      notificationsEnabled: false,
-      enableInAppNotifications: false,
-      openInNewTab: false
+      webhookUrl: `${appUrl}/api/webhook`
     }
   };
 

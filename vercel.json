@@ -2,10 +2,6 @@
   "version": 2,
   "buildCommand": "next build",
   "framework": "nextjs",
-  "rewrites": [
-    { "source": "/.well-known/farcaster.json", "destination": "/api/farcaster.json" },
-    { "source": "/.well-known/farcaster/manifest.json", "destination": "/api/farcaster-manifest" }
-  ],
   "headers": [
     {
       "source": "/(.*)",

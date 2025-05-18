@@ -50,8 +50,8 @@ export default function RootLayout({
         <meta name="theme-color" content="#181028" />
         <link rel="manifest" href="/manifest.json" />
         
-        {/* Farcaster mini app manifest */}
-        <link rel="farcaster-app-config" href="/.well-known/farcaster/manifest.json" />
+        {/* Farcaster manifest */}
+        <link rel="farcaster-app-config" href="/.well-known/farcaster.json" />
         
         {/* OpenGraph Meta Tags */}
         <meta property="og:title" content="8BitMinter" />
