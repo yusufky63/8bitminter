@@ -2,6 +2,7 @@
 
 import { sdk } from "@farcaster/frame-sdk";
 
+
 /**
  * This file handles Farcaster Mini App integration
  * @see https://docs.farcaster.xyz/reference/frames/spec
@@ -92,7 +93,9 @@ export async function isFarcasterMiniApp(): Promise<boolean> {
   if (typeof window === "undefined") return false;
   
   try {
-    return await sdk.isInMiniApp();
+    // Check if the app is running in a mini app context
+    // Pass a timeout of 100ms as per documentation
+    return await (sdk as any).isInMiniApp(100);
   } catch (error) {
     console.error("Error checking if in mini app:", error);
     return false;
