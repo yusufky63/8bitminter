@@ -4,7 +4,6 @@
     "name": "8BitMinter",
     "description": "Create and mint your own 8-bit style tokens on the blockchain.",
     "imageUrl": "https://8bitminter.vercel.app/opengraph-image.png",
-    "buttonTitle": "Create Token",
     "homeUrl": "https://8bitminter.vercel.app",
     "iconUrl": "https://8bitminter.vercel.app/logo.png",
     "splashImageUrl": "https://8bitminter.vercel.app/logo.png",

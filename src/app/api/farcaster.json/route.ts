@@ -26,7 +26,6 @@ export async function GET() {
       ],
       tags: ["nft", "tokens", "blockchain", "web3", "8bit", "retro"],
       primaryCategory: "creation",
-      buttonTitle: "Create Token",
       splashImageUrl: `${appUrl}/logo.png`,
       splashBackgroundColor: "#181028"
     }
