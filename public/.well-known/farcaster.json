@@ -1,8 +1,8 @@
 {
   "accountAssociation": {
-    "header": "",
-    "payload": "",
-    "signature": ""
+    "header": "eyJmaWQiOjg2NDc5MywidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweENjZTJFMjI5NzNmMUY1MTA5MjQzQTZiNkREZTdBNDk4QzlENjYzNjYifQ",
+    "payload": "eyJkb21haW4iOiI4Yml0bWludGVyLnZlcmNlbC5hcHAifQ",
+    "signature": "MHhkMTIzZDUwNDZkZDE5MjlhMmNiMzMyM2FiM2M4Y2M5OTdiMWVjMjZjMjgxODM5Yzg3YmUxZTJlYzBhMDA0Mzg5NzE5NmYxMjlhMWI5OTA0NzA3MzU3MDlhMWUwMjk1YTIxMjU1OTNlYTE5MWFmYjhmMzI3MzAwZGY4NTg1YWY3MjFi"
   },
   "frame": {
     "version": "1",
@@ -13,7 +13,7 @@
     "splashBackgroundColor": "#181028",
     "primaryCategory": "art-creativity",
     "description": "Create and mint your own 8-bit style tokens on the blockchain.",
-    "tags": ["nft", "tokens", "blockchain", "web3", "8bit"],
+    "tags": ["nft", "tokens", "blockchain", "web3", "pixel"],
     "screenshotUrls": [
       "/images/screenshot1.png"
     ],
