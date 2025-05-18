@@ -21,7 +21,7 @@ export async function GET() {
       screenshotUrls: [
         "https://8bitminter.vercel.app/images/screenshot1.png"
       ],
-      tags: ["nft", "tokens", "blockchain", "web3", "pixel"],
+      tags: ["nft", "tokens", "blockchain", "web3", "8bit"],
       primaryCategory: "art-creativity",
       buttonTitle: "Launch 8BitMinter",
       splashImageUrl: "https://8bitminter.vercel.app/logo.png",

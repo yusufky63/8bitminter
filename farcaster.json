@@ -1,4 +1,9 @@
 {
+  "accountAssociation": {
+    "header": "eyJmaWQiOjg2NDc5MywidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweENjZTJFMjI5NzNmMUY1MTA5MjQzQTZiNkREZTdBNDk4QzlENjYzNjYifQ",
+    "payload": "eyJkb21haW4iOiI4Yml0bWludGVyLnZlcmNlbC5hcHAifQ",
+    "signature": "MHhkMTIzZDUwNDZkZDE5MjlhMmNiMzMyM2FiM2M4Y2M5OTdiMWVjMjZjMjgxODM5Yzg3YmUxZTJlYzBhMDA0Mzg5NzE5NmYxMjlhMWI5OTA0NzA3MzU3MDlhMWUwMjk1YTIxMjU1OTNlYTE5MWFmYjhmMzI3MzAwZGY4NTg1YWY3MjFi"
+  },
   "frame": {
     "version": "1",
     "name": "8BitMinter",
@@ -8,8 +13,8 @@
     "iconUrl": "https://8bitminter.vercel.app/logo.png",
     "splashImageUrl": "https://8bitminter.vercel.app/logo.png",
     "splashBackgroundColor": "#181028",
-    "primaryCategory": "creation",
-    "tags": ["nft", "tokens", "blockchain", "web3", "8bit", "retro"],
+    "primaryCategory": "art-creativity",
+    "tags": ["nft", "tokens", "blockchain", "web3", "8bit"],
     "screenshotUrls": [
       "https://8bitminter.vercel.app/images/screenshot1.png"
     ],
