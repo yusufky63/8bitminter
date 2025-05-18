@@ -43,7 +43,6 @@ export default function RootLayout({
         {/* Farcaster Frame configuration */}
         <meta name="fc:frame" content="vNext" />
         <meta name="fc:frame:image" content={`${baseUrl}/opengraph-image.png`} />
-        <meta name="fc:frame:button:1" content="Create Token" />
 
         {/* Farcaster Mini App configuration */}
         <meta name="miniapp:name" content="8BitMinter" />
