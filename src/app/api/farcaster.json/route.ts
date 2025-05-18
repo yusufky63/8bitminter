@@ -11,7 +11,7 @@ export async function GET() {
       signature: ""
     },
     frame: {
-      version: "next",
+      version: "1",
       name: "8BitMinter",
       iconUrl: "/logo.png",
       homeUrl: "https://8bitminter.vercel.app",
