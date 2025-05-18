@@ -9,24 +9,16 @@ import { RetroSteps } from "./ui/RetroSteps";
 import { RetroIntro } from "./RetroIntro";
 import { RetroCategories } from "./RetroCategories";
 import { RetroTokenDetails } from "./RetroTokenDetails";
-import { RetroImageGen } from "./RetroImageGen";
 import { RetroMint } from "./RetroMint";
 import { RetroSuccess } from "./RetroSuccess";
 import { RetroNotification } from "./RetroNotification";
 
 // Services
 import { getCoinCategories } from "../services/aiService.js";
-import { generateImageWithAI } from "../services/aiService";
-import { processTtlgenHerImage, validateIpfsUri } from "../services/imageUtils";
-import { getIPFSDisplayUrl } from "../services/imageUtils";
-import { getCoinCreationParams, createZoraCoin } from "../services/sdk/getCreateCoin.js";
+import { processTtlgenHerImage } from "../services/imageUtils";
+import { createZoraCoin } from "../services/sdk/getCreateCoin.js";
 
-// Add type definition for IPFS validation
-interface IpfsValidationResult {
-  valid: boolean;
-  message: string;
-  uri: string;
-}
+// Type definitions
 // Type definitions
 interface FormData {
   category: string;
@@ -86,14 +78,16 @@ interface FarcasterSDK {
 interface CoinCreationResult {
   hash: string;
   address: string;
-  receipt?: any;
+  receipt?: {
+    blockHash?: string;
+    blockNumber?: bigint;
+    contractAddress?: string;
+    status?: string;
+    transactionHash?: string;
+    [key: string]: unknown;
+  };
 }
 
-interface AIResponse {
-  name: string;
-  symbol: string;
-  description?: string;
-}
 
 export default function RetroCoinCreator() {
   // Basic state
@@ -300,7 +294,7 @@ export default function RetroCoinCreator() {
             const errorData = await response.json();
             errorMessage = errorData.error || errorMessage;
             console.error("❌ AI API error:", errorData);
-          } catch (e) {
+          } catch (_) {
             // JSON parsing failed, use text
             const errorText = await response.text();
             console.error("❌ AI API error text:", errorText);
@@ -333,7 +327,8 @@ export default function RetroCoinCreator() {
         setFormData({
           ...formData,
           name: data.name || formData.name,
-          symbol: data.symbol || formData.symbol
+          symbol: data.symbol || formData.symbol,
+          description: data.description || formData.description // AI tarafından oluşturulan description'ı formData'ya kaydet
         });
         
         // Success toast
@@ -417,35 +412,7 @@ export default function RetroCoinCreator() {
     };
   }, [setAiSuggestion, setFormData, setStep]);
   
-  // Handle AI response
-  const handleAiResponse = useCallback((aiResponse: AIResponse) => {
-    console.log("Got AI response:", aiResponse);
-    
-    if (!aiResponse || !aiResponse.name || !aiResponse.symbol) {
-      console.warn("AI response missing required fields");
-      return;
-    }
-    
-    // Save the AI-generated description for image generation
-    const aiDescription = aiResponse.description || formData.description;
-    
-    // Update form data with AI suggestions
-    setFormData(prev => ({
-      ...prev,
-      name: aiResponse.name,
-      symbol: aiResponse.symbol,
-    }));
-    
-    // Save AI suggestions for reference, including the AI-generated description
-    setAiSuggestion({
-      name: aiResponse.name,
-      symbol: aiResponse.symbol,
-      description: aiDescription // Store the AI description or fallback to user description
-    });
-    
-    // Advance to next step
-    setStep(2);
-  }, [formData.description]);
+
 
   // Generate token image with AI
   const generateTokenImage = useCallback(async () => {
@@ -468,13 +435,13 @@ export default function RetroCoinCreator() {
     // Use AI-generated description if available, otherwise fall back to user description
     const imageDescription = aiSuggestion?.description || formData.description;
     console.log("Using description for image generation:", imageDescription);
+    console.log("AI suggestion:", aiSuggestion);
     
     // Track retries
     let attempts = 0;
     const maxAttempts = 3;
-    let success = false;
     
-    while (attempts < maxAttempts && !success) {
+    while (attempts < maxAttempts) {
       attempts++;
       
       try {
@@ -522,37 +489,45 @@ export default function RetroCoinCreator() {
           throw new Error("No image URL returned from API");
         }
         
-        // Process the image through our service to ensure it's in IPFS format
-        console.log("Processing AI-generated image for IPFS compatibility...");
-        toast.loading("Uploading to IPFS for permanent storage...", { id: 'status-toast' });
+        console.log("Image generation API response:", data);
         
-        const ipfsImageUrl = await processTtlgenHerImage(data.imageUrl);
+        // API'den gelen URL'yi doğrudan kullanarak metadata yarat ve IPFS'e yükle
+        console.log("Processing image URL through IPFS...");
+        toast.loading("Uploading to IPFS...", { id: 'status-toast' });
         
-        // Update form data with IPFS URL
+        try {
+          // Together.ai URL'sinden metadata yarat ve IPFS'e yükle
+          const processedImage = await processTtlgenHerImage(
+            data.imageUrl,
+            formData.name,
+            formData.symbol,
+            aiSuggestion?.description || formData.description  // AI açıklamasını öncelikle kullan
+          );
+        
+          // Update form data with IPFS URI
         setFormData(prev => ({
           ...prev,
-          imageUrl: ipfsImageUrl
+            imageUrl: processedImage.ipfsUri
         }));
         
         // Set display URL for UI
-        const displayUrl = getIPFSDisplayUrl(ipfsImageUrl);
-        setDisplayImageUrl(displayUrl);
-        
-        console.log("Image generated successfully:", {
-          ipfsImageUrl,
-          displayUrl
-        });
-        
-        // Mark as success to exit retry loop
-        success = true;
-        
-        // Show success message
-        toast.success("Image generated and uploaded to IPFS successfully!", {
+          setDisplayImageUrl(data.imageUrl);
+          
+          toast.success("Image metadata uploaded to IPFS successfully!", { 
           id: 'status-toast'
         });
+          
+          console.log("IPFS process completed successfully");
         
         // Move to next step automatically
         setStep(3);
+          
+          // Break out of retry loop
+          break;
+        } catch (ipfsError) {
+          console.error("Failed to process image through IPFS:", ipfsError);
+          throw new Error(`Failed to upload to IPFS: ${ipfsError instanceof Error ? ipfsError.message : "Unknown error"}`);
+        }
       } catch (error) {
         console.error(`Image generation attempt ${attempts} failed:`, error);
         
@@ -657,28 +632,15 @@ export default function RetroCoinCreator() {
         duration: 10000
       });
       
-      // Validate the IPFS URI before attempting to create the coin
-      console.log("Validating IPFS URI:", formData.imageUrl);
-      const validationResult = validateIpfsUri(formData.imageUrl) as IpfsValidationResult;
-      // Log validation result but don't block on warnings
-      if (!validationResult.valid) {
-        console.warn("IPFS URI validation failed:", validationResult.message);
-        toast.error("Image URI may have issues. Using fallback if needed.", {
-          id: 'status-toast',
-          duration: 5000
-        });
-      } else if (validationResult.message !== "URI validated") {
-        console.info("IPFS URI validation warning:", validationResult.message);
-      }
+      // Create Zora coin using SDK with the IPFS URI
+      console.log("Creating coin with URI:", formData.imageUrl);
       
-      try {
-        // Create Zora coin using SDK with the validated URI
         const result = await createZoraCoin({
           name: formData.name,
           symbol: formData.symbol,
-          uri: validationResult.uri, // Use the potentially fixed URI
-          payoutRecipient: walletAddress, // User receives payouts
-          initialPurchaseWei: isPurchaseEnabled ? parseEther(selectedPurchaseAmount) : BigInt(0), // Use 0 if purchase is disabled
+          uri: formData.imageUrl,
+          payoutRecipient: walletAddress,
+          initialPurchaseWei: isPurchaseEnabled ? parseEther(selectedPurchaseAmount) : BigInt(0),
           owners: ownersAddresses.length > 0 ? ownersAddresses : undefined
         }, walletClient, publicClient, { gasMultiplier: 120 }) as CoinCreationResult;
         
@@ -706,78 +668,8 @@ export default function RetroCoinCreator() {
       } catch (error) {
         console.error("Error creating coin:", error);
         
-        // Check for metadata-specific errors
+      // Handle different error types
         if (error instanceof Error && 
-            (error.message.includes("Metadata fetch failed") || 
-             error.message.includes("Data URIs are not supported") ||
-             error.message.includes("URI") ||
-             error.message.includes("metadata") ||
-             error.message.includes("decentralized-content.com") ||
-             error.message.includes("magic.decentralized"))) {
-          
-          // Update the toast with a specific metadata error message
-          toast.error("IPFS gateway is slow - using our faster alternative", {
-            id: 'status-toast',
-            duration: 4000
-          });
-          
-          // Show a more specific error to the user
-          setError("The IPFS gateway is not responding. We're using our high-speed proxy instead. Please wait a moment...");
-          
-          // Wait a moment before retrying with a fallback
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          try {
-            // Try again with a more robust approach - manually specifying a working metadata format
-            const result = await createZoraCoin({
-              name: formData.name,
-              symbol: formData.symbol,
-              uri: formData.imageUrl, // Original URI will trigger our fallback mechanism
-              payoutRecipient: walletAddress,
-              initialPurchaseWei: isPurchaseEnabled ? parseEther(selectedPurchaseAmount) : BigInt(0), // Use 0 if purchase is disabled
-              owners: ownersAddresses.length > 0 ? ownersAddresses : undefined
-            }, walletClient, publicClient, { gasMultiplier: 150 }) as CoinCreationResult;
-            
-            console.log("Token created successfully with fallback method:", result);
-            
-            // Success toast
-            toast.success("Coin created successfully with alternative metadata!", {
-              id: 'status-toast'
-            });
-            
-            // Set contract address
-            if (result && typeof result === 'object' && 'address' in result) {
-              setContractAddress(result.address);
-            } else {
-              setContractAddress("Contract created, address unknown");
-            }
-            
-            // Set success message
-            setSuccess(`Coin ${formData.name} (${formData.symbol}) created successfully on Base network!`);
-            
-            // Move to success screen
-            setStep(4);
-            return;
-          } catch (fallbackError) {
-            // Check if this is an insufficient funds error
-            if (fallbackError instanceof Error && 
-              (fallbackError.message.includes("insufficient funds") || 
-               fallbackError.message.includes("exceeds the balance"))) {
-              // Show clear feedback about funds issue
-              console.error("Insufficient funds for transaction:", fallbackError);
-              toast.error("Not enough ETH in your wallet for this transaction", {
-                id: 'status-toast'
-              });
-              setError(`Failed to create coin: Insufficient funds. Please make sure you have enough ETH (at least ${selectedPurchaseAmount} ETH plus gas).`);
-            } else {
-              console.error("Fallback creation method also failed:", fallbackError);
-              toast.error("Unable to create coin after multiple attempts", {
-                id: 'status-toast'
-              });
-              setError(`Failed to create coin: ${fallbackError instanceof Error ? fallbackError.message : "Unknown error during fallback"}`);
-            }
-          }
-        } else if (error instanceof Error && 
           (error.message.includes("insufficient funds") || 
            error.message.includes("exceeds the balance"))) {
           // Handle insufficient funds error
@@ -788,19 +680,16 @@ export default function RetroCoinCreator() {
           setError(`Failed to create coin: Insufficient funds. Please make sure you have enough ETH (at least ${selectedPurchaseAmount} ETH plus gas).`);
         } else {
           // For other errors, show a general error message
-          toast.error("Failed to create coin", {
+        toast.error(`Failed to create coin: ${error instanceof Error ? error.message : "Unknown error"}`, {
             id: 'status-toast'
           });
           setError(`Failed to create coin: ${error instanceof Error ? error.message : "Unknown error"}`);
         }
-      }
-    } catch (error) {
-      console.error("Error creating coin:", error);
-      setError(`Failed to create coin: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setIsLoading(false);
     }
-  }, [formData, isConnected, walletClient, publicClient, setIsLoading, setError, setContractAddress, setSuccess, setStep, selectedPurchaseAmount, isPurchaseEnabled, ownersAddresses]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData, isConnected, walletClient, publicClient, setIsLoading, setError, setContractAddress, setSuccess, setStep, selectedPurchaseAmount, isPurchaseEnabled, ownersAddresses, aiSuggestion]);
 
   // Connect wallet
   const connectWallet = async () => {
@@ -1004,6 +893,7 @@ export default function RetroCoinCreator() {
         <RetroMint
           name={formData.name}
           symbol={formData.symbol}
+          description={formData.description}
           imageUrl={formData.imageUrl}
           displayImageUrl={displayImageUrl}
           isPurchaseEnabled={isPurchaseEnabled}
@@ -1032,6 +922,7 @@ export default function RetroCoinCreator() {
           contractAddress={contractAddress}
           tokenName={formData.name}
           tokenSymbol={formData.symbol}
+          description={formData.description}
           displayImageUrl={displayImageUrl}
           onViewOnBasescan={openBasescan}
           onCreateAnother={resetForm}

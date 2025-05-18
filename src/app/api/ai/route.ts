@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateTextWithAI, generateImageWithAI } from '../../../services/aiService';
+import { storeToIPFS } from '../../../services/pinata';
 
 // Rate limiting variables
 const apiCalls = new Map<string, { count: number, lastReset: number }>();
@@ -262,6 +263,8 @@ export async function POST(request: NextRequest) {
           throw new Error("Invalid image URL returned from generation service");
         }
         
+        // Simply return the image URL without any processing
+        // Let the client handle it directly without proxies
         return NextResponse.json({ imageUrl: result }, { headers: baseHeaders });
       } catch (imageError) {
         console.error('❌ Image generation error:', imageError);

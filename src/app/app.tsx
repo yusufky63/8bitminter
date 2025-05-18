@@ -24,20 +24,7 @@ function NoSSR({ children }: { children: React.ReactNode }) {
 }
 NoSSR.displayName = 'NoSSR';
 
-// Farcaster SDK Preloader component
-function FarcasterSDKPreloader() {
-  useEffect(() => {
-    // Preload SDK in browser environment
-    if (typeof window !== 'undefined') {
-      // Preload the SDK
-      import('@farcaster/frame-sdk').catch(err => {
-        console.warn("Failed to preload Farcaster SDK:", err);
-      });
-    }
-  }, []);
-  
-  return null;
-}
+
 
 // Farcaster Frame SDK'yı kullanan bileşenler için daha iyi dinamik import yaklaşımı
 const CoinCreatorDynamic = dynamic(
@@ -46,7 +33,7 @@ const CoinCreatorDynamic = dynamic(
     // Önce SDK'yı browser-only olarak import etmeyi dene
     if (typeof window !== 'undefined') {
       // En iyi dynamicImport yaklaşımı
-      return import("~/components/RetroCoinCreator").catch(err => {
+      return import("../components/RetroCoinCreator").catch(err => {
         console.error("[APP] Error dynamically importing RetroCoinCreator:", err);
         const FallbackComponent = () => <div>Failed to load RetroCoinCreator component</div>;
         FallbackComponent.displayName = 'CoinCreatorFallback';
@@ -80,7 +67,7 @@ const CoinHolderView = dynamic(
 );
 
 const CoinExplorer = dynamic(
-  () => import("../components/CoinExplorer").catch(err => {
+  () => import("../components/RetroCoinExplorer").catch(err => {
     console.error("[APP] Error importing CoinExplorer:", err);
     const FallbackComponent = () => (
       <div className="retro-container p-4">

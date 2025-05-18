@@ -21,10 +21,12 @@ export default function RetroHeader({ activeTab = "create", onTabChange }: Heade
       <div className="crt-effect retro-container py-1 mb-0.5">
         <div className="retro-grid-background">
           <div className="flex items-center justify-center gap-2">
-         
-            <h1 className="retro-header text-center retro-glow text-base font-bold tracking-wider py-1">
-              VisionZ Coin Maker
-            </h1>
+            <div className="flex items-center">
+              <img src="/logo.png" alt="Logo" className="w-10 h-10 mr-3 pixelated" />
+              <h1 className="text-xl font-bold tracking-tight text-retro-accent font-mono">
+                8BitMinter
+              </h1>
+            </div>
           </div>
         </div>
       </div>

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { useAccount, usePublicClient } from "wagmi";
 import { RetroButton } from "./ui/RetroButton";
 import { getProfileBalance, getZoraProfile } from "../services/sdk/getProfiles.js";
 import { validateTradeBalance } from "../services/sdk/getTradeCoin.js";
 import { toast } from "react-hot-toast";
-import CoinDetails from "./CoinDetails";
+import CoinDetails from "./RetroCoinDetails";
 
 interface TokenBalance {
   address: string;
@@ -410,10 +411,13 @@ export default function CoinHolderView() {
               <div className="retro-card p-2 mb-3">
                 <div className="flex items-center gap-3">
                   {userProfile.avatar ? (
-                    <img 
+                    <Image 
                       src={userProfile.avatar}
                       alt={userProfile.displayName || "Profile"} 
+                      width={48}
+                      height={48}
                       className="w-12 h-12 rounded-full border-2 border-retro-primary"
+                      unoptimized
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
                         target.onerror = null;
@@ -509,10 +513,13 @@ export default function CoinHolderView() {
             >
               <div className="flex items-center gap-2">
                 {token.imageUrl ? (
-                  <img 
+                  <Image 
                     src={token.imageUrl} 
                     alt={token.name} 
+                    width={40}
+                    height={40}
                     className="w-10 h-10 rounded-md pixelated"
+                    unoptimized
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.onerror = null;

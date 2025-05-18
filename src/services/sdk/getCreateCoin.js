@@ -8,65 +8,16 @@ import { setApiKey } from "@zoralabs/coins-sdk";
 import { base } from 'viem/chains';
 import { toast } from 'react-hot-toast';
 
-// Determine the global object based on environment
-const globalObj = typeof window !== 'undefined' ? window : 
-                  typeof global !== 'undefined' ? global : 
-                  typeof self !== 'undefined' ? self : {};
-
-// Patch the fetch to intercept problematic IPFS requests
-const originalFetch = globalObj.fetch;
-
-// Create a proxy fetch function that intercepts problematic IPFS URLs
-globalObj.fetch = async function patchedFetch(url, options) {
-  // Check if this is an IPFS URL from a problematic domain
-  const urlStr = url.toString();
-  
-  // Specifically intercept the problematic gateway that's timing out
-  if (urlStr.includes('magic.decentralized-content.com/ipfs/') || 
-      urlStr.includes('decentralized-content.com') ||
-      (urlStr.includes('/ipfs/QmdQ4a57yA1J3qe1Mi8ThBBimKvEkyywNEts1ERXgv3oFt'))) {
-    
-    console.log(`🔄 Intercepting problematic IPFS request: ${urlStr}`);
-    
-    try {
-      // Extract the IPFS hash
-      let hash = '';
-      if (urlStr.includes('/ipfs/')) {
-        hash = urlStr.split('/ipfs/').pop().split('/')[0].split('?')[0];
-      }
-      
-      if (!hash) {
-        console.warn('Could not extract IPFS hash from URL, using original fetch');
-        return originalFetch(url, options);
-      }
-      
-      // Redirect to our proxy
-      const baseUrl = typeof window !== 'undefined' 
-        ? window.location.origin 
-        : process.env.NEXT_PUBLIC_URL || 'http://localhost:3000';
-      
-      const proxyUrl = `${baseUrl}/api/ipfs?hash=${hash}`;
-      console.log(`🔀 Redirecting to local IPFS proxy: ${proxyUrl}`);
-      
-      // Use original fetch with our proxy URL
-      return originalFetch(proxyUrl, options);
-    } catch (error) {
-      console.error('Error in fetch proxy, falling back to original fetch:', error);
-      return originalFetch(url, options);
-    }
-  }
-  
-  // For all other URLs, use the original fetch
-  return originalFetch(url, options);
-};
-
 // Initialize API key for production environments
-// Uses environment variable or allows manual override
 const initializeApiKey = () => {
   const apiKey = process.env.NEXT_PUBLIC_ZORA_API_KEY;
   if (apiKey) {
     setApiKey(apiKey);
     console.log("Zora API key initialized from environment variables");
+  } else {
+    // Set default API key for testing - remove in production
+    setApiKey("zora_api_key");
+    console.log("Zora API key set to default value for testing");
   }
 };
 
@@ -77,7 +28,6 @@ initializeApiKey();
 const ZORA_FACTORY_ADDRESS_SDK_TARGET = '0x02B2705500096Ff83F9eF78873ca5DFB06C00Ddc';
 // Bu spesifik fabrika adresi için Base'de çalışan tickLower değeri
 const WETH_TICK_LOWER_FOR_SDK_TARGET = -208200;
-
 
 /**
  * Prepares contract call parameters for coin creation
@@ -156,38 +106,6 @@ export async function getCoinCreationParams({
 } 
 
 /**
- * Validates URI and ensures it's a proper IPFS URI
- * @param {string} uri - URI to validate
- * @returns {string} Validated URI
- */
-const validateAndFixUri = (uri) => {
-  if (!uri) {
-    throw new Error("URI is required for coin creation");
-  }
-
-  // If URI isn't in ipfs:// format, try to fix it
-  if (!uri.startsWith('ipfs://')) {
-    // Try to extract IPFS hash from HTTP URL
-    if (uri.includes('/ipfs/')) {
-      const hash = uri.split('/ipfs/').pop();
-      console.log("Extracted IPFS hash from HTTP URL:", hash);
-      return `ipfs://${hash}`;
-    }
-    
-    // Handle direct gateway links like gateway.pinata.cloud/{hash}
-    const lastSegment = uri.split('/').pop();
-    if (lastSegment && lastSegment.length > 20) {
-      console.log("Extracted potential IPFS hash from URL:", lastSegment);
-      return `ipfs://${lastSegment}`;
-    }
-    
-    console.warn("URI doesn't follow ipfs:// format:", uri);
-  }
-  
-  return uri;
-};
-
-/**
  * Creates a Zora coin using the SDK's createCoin function
  * @param {Object} params - Coin creation parameters
  * @param {string} params.name - Name of the coin
@@ -224,28 +142,13 @@ export async function createZoraCoin({
       owners = [payoutRecipient];
     }
     
-    // Validate and fix the URI if needed
-    const validatedUri = validateAndFixUri(uri);
-
-    // Ensure initialPurchaseWei is a valid bigint and is within reasonable bounds
-    if (typeof initialPurchaseWei !== 'bigint') {
-      console.warn("initialPurchaseWei was not a bigint, converting to bigint");
-      try {
-        initialPurchaseWei = BigInt(initialPurchaseWei || 0);
-      } catch (e) {
-        console.error("Failed to convert initialPurchaseWei to bigint:", e);
-        initialPurchaseWei = 0n;
-      }
-    }
-
-    // Log the parameters we intend to use
     console.log("Creating coin with direct SDK call:", {
       name,
       symbol,
-      uri: validatedUri,
+      uri,
       payoutRecipient,
       owners,
-      initialPurchaseWei: initialPurchaseWei.toString(), // Convert to string for clean logging
+      initialPurchaseWei,
       tickLower: WETH_TICK_LOWER_FOR_SDK_TARGET
     });
 
@@ -261,58 +164,12 @@ export async function createZoraCoin({
       throw new Error(`Chain mismatch: Connected to chain ${walletChainId}, but Base (${base.id}) is required. Please switch networks.`);
     }
 
-    // Check user's balance to ensure they have enough for this transaction
-    try {
-      const [walletAddress] = await walletClient.getAddresses();
-      const balance = await publicClient.getBalance({ address: walletAddress });
-      
-      if (balance < initialPurchaseWei) {
-        toast.error("Your wallet doesn't have enough funds for this transaction", {
-          id: "balance-error",
-          duration: 5000
-        });
-        throw new Error(`Insufficient funds: wallet has ${balance.toString()} wei, but transaction requires at least ${initialPurchaseWei.toString()} wei`);
-      }
-    } catch (balanceError) {
-      console.warn("Balance check failed, proceeding anyway:", balanceError);
-      // Continue with the transaction attempt - the chain will reject if insufficient funds
-    }
-
-    // Maximum retries for handling metadata fetch errors
-    const MAX_RETRIES = 3;
-    let attempt = 0;
-    let lastError = null;
-
-    // Function to convert metadata to HTTP URL from IPFS
-    const convertToHttpUrl = (ipfsUri) => {
-      if (!ipfsUri) return null;
-      if (ipfsUri.startsWith('ipfs://')) {
-        const hash = ipfsUri.substring(7);
-        return `https://gateway.pinata.cloud/ipfs/${hash}`;
-      }
-      return ipfsUri;
-    };
-
-    // Function to create a publicly accessible metadata URL
-    const createPublicMetadataUrl = async (name, symbol, description) => {
-      try {
-        // SDK'nın kendi sürecini kullanıyoruz, hazır veri kullanmaktan kaçınıyoruz
-        console.log("Doğrudan URI kullanmaya çalışıyoruz");
-        throw new Error("URI erişilemedi");
-      } catch (error) {
-        console.error("Metadata URI erişim hatası:", error);
-        throw error; // Hata durumunu üst seviyeye ilet
-      }
-    };
-
-    while (attempt < MAX_RETRIES) {
-      try {
         // Use the SDK's createCoin function directly
         const result = await createCoin(
           {
             name,
             symbol,
-            uri: validatedUri,
+        uri,
             payoutRecipient,
             owners,
             initialPurchaseWei,
@@ -329,92 +186,6 @@ export async function createZoraCoin({
         });
 
         return result;
-      } catch (error) {
-        attempt++;
-        lastError = error;
-        
-        console.error(`Attempt ${attempt}/${MAX_RETRIES} failed:`, error);
-        
-        // Check if this is an insufficient funds error
-        if (error.message && (
-            error.message.includes("insufficient funds") ||
-            error.message.includes("exceeds the balance") ||
-            error.message.includes("Insufficient funds")
-        )) {
-          toast.error("Not enough ETH in your wallet to complete this transaction", {
-            id: "funds-error",
-            duration: 4000
-          });
-          
-          // This is a terminal error - no point in retrying
-          throw new Error(`Transaction failed due to insufficient funds: ${error.message}`);
-        }
-        
-        // Check if this is a metadata fetch error
-        if (error.message && (
-            error.message.includes("Metadata fetch failed") || 
-            error.message.includes("metadata") || 
-            error.message.includes("URI") ||
-            error.message.includes("ipfs")
-        )) {
-          // Create a public HTTP URL for the metadata
-          if (attempt === MAX_RETRIES - 1) {
-            try {
-              const publicMetadataUrl = await createPublicMetadataUrl(name, symbol, `${name} token`);
-              console.log("Using public HTTP metadata URL as fallback:", publicMetadataUrl);
-              
-              const result = await createCoin(
-                {
-                  name,
-                  symbol,
-                  uri: publicMetadataUrl,
-                  payoutRecipient,
-                  owners,
-                  initialPurchaseWei,
-                  tickLower: WETH_TICK_LOWER_FOR_SDK_TARGET
-                },
-                walletClient,
-                publicClient,
-                { gasMultiplier: options.gasMultiplier || 120 }
-              );
-              
-              console.log("Coin created successfully with public metadata URL:", {
-                hash: result.hash,
-                address: result.address
-              });
-              
-              return result;
-            } catch (httpError) {
-              console.error("Public metadata URL fallback also failed:", httpError);
-              // Continue to try one more approach
-            }
-          }
-          
-          // If all previous attempts fail, try with a hardcoded URI
-          if (attempt === MAX_RETRIES) {
-            try {
-              console.log("Son deneme, doğrudan IPFS URI kullanılıyor...");
-              // SDK'nın kendi sürecine daha fazla şans tanıyoruz
-              throw new Error("Doğrudan IPFS URI kullanımı devre dışı bırakıldı");
-            } catch (fallbackError) {
-              console.error("Tüm yaklaşımlar başarısız oldu:", fallbackError);
-              throw fallbackError;
-            }
-          }
-          
-          // Wait before retrying
-          console.log(`Waiting before retry ${attempt}...`);
-          await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
-          continue;
-        } else {
-          // If it's not a metadata error, re-throw immediately
-          throw error;
-        }
-      }
-    }
-    
-    // If we've exhausted all retries, throw the last error
-    throw lastError || new Error("Failed to create coin after multiple attempts");
   } catch (error) {
     console.error("Error creating coin:", error);
     throw new Error(`Failed to create coin: ${error.message}`);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useAccount, usePublicClient } from "wagmi";
+import Image from "next/image";
 import { RetroButton } from "./ui/RetroButton";
 import { searchTokenByAddress } from "../services/sdk/getCoins.js";
 import { 
@@ -10,7 +10,7 @@ import {
   fetchWithRetry
 } from "../services/sdk/getMarket.js";
 import { toast } from "react-hot-toast";
-import CoinDetails from "./CoinDetails";
+import CoinDetails from "./RetroCoinDetails";
 
 // Define custom window interface for Farcaster
 declare global {
@@ -46,8 +46,6 @@ interface TokenDetails {
 type FilterType = 'most-valuable' | 'top-volume' | 'new-tokens' | 'recently-traded';
 
 export default function CoinExplorer() {
-  const { address, isConnected } = useAccount();
-  const publicClient = usePublicClient();
   const [isLoading, setIsLoading] = useState(false);
   const [isError, setIsError] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -59,9 +57,9 @@ export default function CoinExplorer() {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const tokensPerPage = 10;
-  const [totalTokens, setTotalTokens] = useState(100);
-  const [hasMore, setHasMore] = useState(false);
-  const [paginationCursor, setPaginationCursor] = useState<string | null>(null);
+  const totalTokens = 100;
+  const [, setHasMore] = useState(false);
+  const [, setPaginationCursor] = useState<string | null>(null);
   const [displayMode, setDisplayMode] = useState<'paginated' | 'all'>('paginated');
 
   // Load market data based on the active filter
@@ -173,7 +171,7 @@ export default function CoinExplorer() {
       if (isNaN(num)) return "0";
       
       return num.toFixed(3);
-    } catch (e) {
+    } catch (_) {
       return "0";
     }
   };
@@ -379,10 +377,13 @@ export default function CoinExplorer() {
         <div className="retro-card p-2 mb-4">
           <div className="flex items-start gap-2 mb-3">
             {tokenDetails.imageUri ? (
-              <img 
+              <Image 
                 src={tokenDetails.imageUri} 
                 alt={tokenDetails.name} 
+                width={56}
+                height={56}
                 className="w-14 h-14 rounded-md pixelated"
+                unoptimized
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.onerror = null;
@@ -460,10 +461,13 @@ export default function CoinExplorer() {
             <div key={token.address} className="retro-card p-2 hover:border-retro-accent transition-colors cursor-pointer" onClick={() => handleViewDetails(token.address)}>
               <div className="flex items-center gap-2">
                 {token.imageUri ? (
-                  <img 
+                  <Image 
                     src={token.imageUri} 
-                    alt={token.name} 
+                    alt={token.name}
+                    width={40}
+                    height={40}
                     className="w-10 h-10 rounded-md pixelated"
+                    unoptimized
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.onerror = null;

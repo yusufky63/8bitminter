@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
 
     // Basit bir frame yanıtı döndür
     return NextResponse.json({
-      image: `${process.env.NEXT_PUBLIC_URL || 'https://visionz-mini.vercel.app'}/opengraph-image.png`,
+      image: `${process.env.NEXT_PUBLIC_URL || 'https://8bitminter.vercel.app'}/opengraph-image.png`,
       buttons: [
         {
           label: 'Create Vision',

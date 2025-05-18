@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { RetroStepScreen } from "./RetroStepScreen";
 import { RetroDivider } from "./RetroDivider";
 import { RetroButton } from "./ui/RetroButton";
-import { RetroInput } from "./ui/RetroInput";
 
 interface RetroMintProps {
   name: string;
   symbol: string;
+  description: string;
   imageUrl: string;
   displayImageUrl: string;
   isPurchaseEnabled: boolean;
@@ -32,7 +33,7 @@ interface RetroMintProps {
 export function RetroMint({
   name,
   symbol,
-  imageUrl,
+  description,
   displayImageUrl,
   isPurchaseEnabled,
   selectedPurchaseAmount,
@@ -93,9 +94,11 @@ export function RetroMint({
         <div className="flex items-center mb-4">
           {displayImageUrl && (
             <div className="w-24 h-24 border-2 border-retro-primary mr-4">
-              <img
+              <Image
                 src={displayImageUrl}
                 alt="Token"
+                width={96}
+                height={96}
                 className="w-full h-full object-cover pixelated"
               />
             </div>
@@ -108,9 +111,15 @@ export function RetroMint({
               
               <div className="text-retro-primary">SYMBOL:</div>
               <div className="text-retro-accent">{symbol}</div>
+
+              <div className="text-retro-primary">DESCRIPTION:</div>
+              <div className="text-retro-accent text-xs">{description}</div>
             </div>
           </div>
         </div>
+
+        {/* Add description section */}
+     
         
         <RetroDivider text="PURCHASE SETTINGS" />
         

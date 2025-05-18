@@ -126,7 +126,7 @@ export async function processImageAndUploadToIPFS(imageUrl, name, symbol, descri
         const metadata = {
             name,
             symbol,
-            description: description || `${name} (${symbol}) - A token created with VisionZ`,
+            description: description || `${name} (${symbol}) - A token created with 8BitMinter`,
             image: imageUrl
         };
         
@@ -179,65 +179,55 @@ export async function uploadJsonToIPFS(metadata) {
 }
 
 /**
- * Processes images from ttlgenHer or other external services to ensure IPFS compatibility
- * @param {string} imageUrl - The image URL to process (could be from ttlgenHer or other sources)
- * @returns {Promise<string>} - Returns a promise that resolves to an IPFS URL for the image
+ * Together.ai'den gelen resmi işleyip, görünür URL ve IPFS-benzeri URI oluştur
+ * @param {string} imageUrl - Together.ai API'den gelen resim URL'si
+ * @param {string} [tokenName] - Token name
+ * @param {string} [tokenSymbol] - Token symbol
+ * @param {string} [tokenDescription] - Token description
+ * @returns {Promise<{displayUrl: string, ipfsUri: string}>} - Görünür URL ve ipfs URI
  */
-export async function processTtlgenHerImage(imageUrl) {
+export async function processTtlgenHerImage(imageUrl, tokenName, tokenSymbol, tokenDescription) {
   try {
+    console.log("Processing external image URL:", imageUrl);
+    
+    // URL kontrolü
     if (!imageUrl) {
       throw new Error("No image URL provided");
     }
     
-    console.log("Processing external image URL:", imageUrl);
+    // Direkt Together.ai URL'sini displayUrl olarak kullan
+    const displayUrl = imageUrl;
     
-    // First check if it's already an IPFS URI
-    if (imageUrl.startsWith('ipfs://')) {
-      console.log("Image is already in IPFS format, returning as is");
-      return imageUrl;
-    }
+    // Metadata with actual token details (AI description is prioritized)
+    const metadata = {
+      name: tokenName || "Token", 
+      description: tokenDescription || `${tokenName} token - Created with 8BitMinter`,
+      symbol: tokenSymbol,
+      image: imageUrl
+    };
     
-    // For external URLs, we need to fetch the image and upload it to IPFS
-    // This is similar to processImageAndUploadToIPFS but specifically for external services
+    console.log("Creating metadata with description:", tokenDescription);
     
-    // Validate URL format
-    try {
-      new URL(imageUrl);
-    } catch (e) {
-      console.error("Invalid URL format:", imageUrl);
-      throw new Error("Invalid image URL format");
-    }
+    // Metadata JSON'ı oluştur
+    const jsonBlob = new Blob([JSON.stringify(metadata)], { 
+      type: 'application/json' 
+    });
     
-    // Get validation result - this helps normalize gateway URLs
-    const validation = validateIpfsUri(imageUrl);
+    // Direkt metadata'yı IPFS'e yükle - hiç yönlendirme olmadan
+    const ipfsResult = await storeToIPFS(jsonBlob);
     
-    // If the validation converted it to a proper IPFS URI, use that
-    if (validation.valid && validation.uri.startsWith('ipfs://')) {
-      console.log("Converted to IPFS URI:", validation.uri);
-      return validation.uri;
-    }
-    
-    // Otherwise, we need to fetch and upload the image
-    console.log("Fetching image from external URL to upload to IPFS...");
-    
-    try {
-      // Try to upload the image directly using our existing function
-      const ipfsHash = await uploadImageToIPFS(imageUrl);
-      if (ipfsHash) {
-        const ipfsUri = `ipfs://${ipfsHash}`;
-        console.log("Successfully uploaded image to IPFS:", ipfsUri);
-        return ipfsUri;
+    if (!ipfsResult || !ipfsResult.url || !ipfsResult.url.startsWith('ipfs://')) {
+      throw new Error("IPFS upload failed - invalid result");
       }
-    } catch (uploadError) {
-      console.error("Error uploading image to IPFS:", uploadError);
-      // Continue with fallback approach
-    }
     
-    // If we couldn't upload it ourselves, use the original URL as a fallback
-    console.warn("Could not upload to IPFS, returning original URL as fallback");
-    return imageUrl;
+    console.log("Metadata uploaded to IPFS successfully:", ipfsResult.url);
+    
+    return {
+      displayUrl: displayUrl,
+      ipfsUri: ipfsResult.url // Doğrudan IPFS URI'yi kullan
+    };
   } catch (error) {
-    console.error("Error processing image:", error);
-    throw error;
+    console.error("Error processing Together.ai image:", error);
+    throw new Error(`Failed to process image: ${error.message}`);
   }
 }

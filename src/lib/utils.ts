@@ -1,6 +1,5 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { mnemonicToAccount } from 'viem/accounts';
 
 interface FrameMetadata {
   accountAssociation?: {
@@ -46,14 +45,16 @@ export async function getFarcasterMetadata(): Promise<FrameMetadata> {
     },
     frame: {
       version: "1",
-      name: "VisionZ Retro",
-      iconUrl: `${process.env.NEXT_PUBLIC_URL || 'https://visionz-mini.vercel.app'}/logo.png`,
-      imageUrl: `${process.env.NEXT_PUBLIC_URL || 'https://visionz-mini.vercel.app'}/opengraph-image.png`,
-      buttonTitle: "Create Vision",
-      homeUrl: process.env.NEXT_PUBLIC_URL || 'https://visionz-mini.vercel.app',
-      splashImageUrl: `${process.env.NEXT_PUBLIC_URL || 'https://visionz-mini.vercel.app'}/logo.png`,
+      name: "8BitMinter",
+      iconUrl: `${process.env.NEXT_PUBLIC_URL || 'https://8bitminter.vercel.app'}/logo.png`,
+      imageUrl: `${process.env.NEXT_PUBLIC_URL || 'https://8bitminter.vercel.app'}/opengraph-image.png`,
+      buttonTitle: "Create Token",
+      homeUrl: process.env.NEXT_PUBLIC_URL || 'https://8bitminter.vercel.app',
+      splashImageUrl: `${process.env.NEXT_PUBLIC_URL || 'https://8bitminter.vercel.app'}/logo.png`,
       splashBackgroundColor: "#000000",
-      webhookUrl: `${process.env.NEXT_PUBLIC_URL || 'https://visionz-mini.vercel.app'}/api/webhook`
+      webhookUrl: `${process.env.NEXT_PUBLIC_URL || 'https://8bitminter.vercel.app'}/api/webhook`
     },
   };
 }
+
+

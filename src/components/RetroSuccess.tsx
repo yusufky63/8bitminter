@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 import { RetroStepScreen } from "./RetroStepScreen";
 import { RetroDivider } from "./RetroDivider";
 import { RetroButton } from "./ui/RetroButton";
@@ -7,6 +8,7 @@ interface RetroSuccessProps {
   contractAddress: string;
   tokenName: string;
   tokenSymbol: string;
+  description: string;
   displayImageUrl: string;
   onViewOnBasescan: () => void;
   onCreateAnother: () => void;
@@ -16,9 +18,9 @@ export function RetroSuccess({
   contractAddress,
   tokenName,
   tokenSymbol,
+  description,
   displayImageUrl,
-  onViewOnBasescan,
-  onCreateAnother
+
 }: RetroSuccessProps) {
   const copyToClipboard = () => {
     navigator.clipboard.writeText(contractAddress);
@@ -26,15 +28,47 @@ export function RetroSuccess({
 
   // Open coin on Zora
   const openOnZora = () => {
-    window.open(`https://zora.co/collections/base/${contractAddress}`, '_blank');
+    window.open(`https://zora.co/coin/${contractAddress}`, '_blank');
   };
 
-  // Go to trading page
-  const goToTrade = () => {
-    // Redirect to internal coin details view instead of external Zora
+  // Go to Hold page to view the token
+  const goToHoldTab = () => {
+    // Find the header component and trigger tab change to "hold"
     if (typeof window !== 'undefined') {
-      // Navigate to the explorer page with the specific coin
-      window.location.href = `/coins/${contractAddress}`;
+      // Add the contract to local storage so the Hold tab can show it
+      try {
+        // Get existing watched tokens or initialize empty array
+        const watchedTokens = JSON.parse(localStorage.getItem('watchedTokens') || '[]');
+        
+        // Add this token if it doesn't exist
+        if (!watchedTokens.some((token: any) => token.address === contractAddress)) {
+          watchedTokens.push({
+            address: contractAddress,
+            name: tokenName,
+            symbol: tokenSymbol,
+            icon: displayImageUrl
+          });
+          
+          // Save back to localStorage
+          localStorage.setItem('watchedTokens', JSON.stringify(watchedTokens));
+        }
+        
+        // Find RetroHeader and trigger tab change to "hold"
+        const changeTabEvent = new CustomEvent('changeTab', { 
+          detail: { tab: 'hold' } 
+        });
+        window.dispatchEvent(changeTabEvent);
+        
+        // Navigate to root with hash for hold tab
+        window.location.href = "/#hold";
+        
+        // Reload the page to ensure tab change
+        setTimeout(() => window.location.reload(), 100);
+      } catch (error) {
+        console.error("Failed to save token to localStorage:", error);
+        // Fallback - just try to change tab
+        window.location.href = "/#hold";
+      }
     }
   };
 
@@ -104,9 +138,11 @@ export function RetroSuccess({
         {displayImageUrl && (
           <div className="mr-4">
             <div className="w-24 h-24 border-2 border-retro-primary">
-              <img
+              <Image
                 src={displayImageUrl}
                 alt="Token"
+                width={96}
+                height={96}
                 className="w-full h-full object-cover pixelated"
               />
             </div>
@@ -121,6 +157,17 @@ export function RetroSuccess({
             <div className="text-retro-primary">SYMBOL:</div>
             <div className="text-retro-accent">{tokenSymbol}</div>
           </div>
+          
+          {/* Display description */}
+          <details open className="mt-3 border border-retro-primary">
+            <summary className="font-mono text-xs text-retro-primary bg-retro-dark p-1 cursor-pointer flex items-center">
+              <span className="inline-block w-2 h-2 bg-retro-accent mr-1"></span>
+              AI-GENERATED DESCRIPTION
+            </summary>
+            <div className="p-2 bg-retro-darker">
+              <p className="text-xs font-mono text-retro-accent">{description}</p>
+            </div>
+          </details>
         </div>
       </div>
       
@@ -139,13 +186,13 @@ export function RetroSuccess({
         </RetroButton>
         
         <RetroButton
-          onClick={goToTrade}
+          onClick={goToHoldTab}
           fullWidth
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter" className="mr-2">
             <path d="M12 1v22M1 12h22M4.93 4.93l14.14 14.14M4.93 19.07l14.14-14.14"></path>
           </svg>
-          TRADE
+          HOLD
         </RetroButton>
       </div>
     </RetroStepScreen>

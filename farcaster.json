@@ -6,12 +6,12 @@
   },
   "frame": {
     "version": "1",
-    "name": "VisionZ Retro",
-    "imageUrl": "https://visionz-mini.vercel.app/opengraph-image.png",
-    "buttonTitle": "Create Vision",
-    "homeUrl": "https://visionz-mini.vercel.app",
-    "splashImageUrl": "https://visionz-mini.vercel.app/logo.png",
+    "name": "8BitMinter",
+    "imageUrl": "https://8bitminter.vercel.app/opengraph-image.png",
+    "buttonTitle": "Create Token",
+    "homeUrl": "https://8bitminter.vercel.app",
+    "splashImageUrl": "https://8bitminter.vercel.app/logo.png",
     "splashBackgroundColor": "#000000",
-    "webhookUrl": "https://visionz-mini.vercel.app/api/webhook"
+    "webhookUrl": "https://8bitminter.vercel.app/api/webhook"
   }
 }

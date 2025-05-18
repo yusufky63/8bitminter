@@ -12,11 +12,10 @@
   },
   "types": "./index.d.ts",
   "scripts": {
-    "dev": "node scripts/dev.js",
-    "build": "node scripts/build.js",
+    "dev": "next dev",
+    "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "deploy:vercel": "node scripts/deploy.js"
+    "lint": "next lint"
   },
   "dependencies": {
     "@farcaster/auth-client": ">=0.3.0 <1.0.0",

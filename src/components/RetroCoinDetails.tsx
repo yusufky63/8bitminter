@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useAccount, usePublicClient, useWalletClient, useWriteContract } from "wagmi";
+import Image from "next/image";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { toast } from "react-hot-toast";
 import { getCoinDetails } from "../services/sdk/getCoins.js";
 import { validateTradeBalance, checkETHBalance, checkTokenBalance, getTradeContractCallParams } from "../services/sdk/getTradeCoin.js";
-import { formatUnits, parseUnits } from "ethers";
-import { formatEther, parseEther } from "viem";
+import {  parseEther } from "viem";
 import { RetroButton } from "./ui/RetroButton";
-import { RetroInput } from "./ui/RetroInput";
 
 interface CoinDetailsProps {
   coinAddress?: string;
@@ -67,26 +66,25 @@ interface ValidationResult {
   error?: Error;
 }
 
-// Add Viem-compatible type definition for contract parameters
-interface ContractCallParams {
-  to: `0x${string}`;  // Viem hex format
-  data: `0x${string}`; // Viem hex format
-  value?: bigint;
-}
 
 // Contract parameters interface for type safety
 interface TradeContractParams {
   address: `0x${string}`;
-  abi: any[];
+  abi: readonly {
+    name: string;
+    type: string;
+    inputs?: readonly { name: string; type: string; internalType?: string }[];
+    outputs?: readonly { name: string; type: string; internalType?: string }[];
+    stateMutability?: string;
+  }[];
   functionName: string;
-  args: any[];
+  args: readonly unknown[];
   value?: bigint;
 }
 
 export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
-  const { data: walletClient } = useWalletClient();
   
   // useWriteContract hook'unu kullan
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
@@ -104,7 +102,6 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
   const [transactionStatus, setTransactionStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
 
   // Add a variable to track if the amount is valid
-  const validAmount = tradeAmount && parseFloat(tradeAmount) > 0;
 
   // Fetch ETH price in USD
   const fetchEthPrice = useCallback(async () => {
@@ -485,10 +482,13 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
           <div className="mb-4 bg-gradient-to-b from-retro-primary/10 to-transparent p-3  border-2 border-retro-primary shadow-[0_0_12px_rgba(255,107,53,0.15)]">
             <div className="flex items-start gap-3">
               {tokenDetails.imageUri ? (
-                <img 
+                <Image 
                   src={tokenDetails.imageUri} 
                   alt={tokenDetails.name} 
+                  width={64}
+                  height={64}
                   className="w-16 h-16 rounded-md pixelated border-2 border-retro-primary object-cover"
+                  unoptimized
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     target.onerror = null;
