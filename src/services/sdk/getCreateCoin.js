@@ -24,9 +24,7 @@ const initializeApiKey = () => {
 // Call initialization on module load
 initializeApiKey();
 
-// SDK'nın işaret ettiği ve starter kit'in muhtemelen kullandığı (kanonik olmayan) fabrika adresi
 const ZORA_FACTORY_ADDRESS_SDK_TARGET = '0x02B2705500096Ff83F9eF78873ca5DFB06C00Ddc';
-// Bu spesifik fabrika adresi için Base'de çalışan tickLower değeri
 const WETH_TICK_LOWER_FOR_SDK_TARGET = -208200;
 
 /**
@@ -177,7 +175,7 @@ export async function createZoraCoin({
           },
           walletClient,
           publicClient,
-          { gasMultiplier: options.gasMultiplier || 120 } // Default to 120% gas
+          { gasMultiplier: options.gasMultiplier } // Default to 120% gas
         );
 
         console.log("Coin created successfully:", {

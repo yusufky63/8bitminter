@@ -3,6 +3,14 @@ import Image from "next/image";
 import { RetroStepScreen } from "./RetroStepScreen";
 import { RetroDivider } from "./RetroDivider";
 import { RetroButton } from "./ui/RetroButton";
+// Import only if needed for types, but don't use directly
+// import { sdk } from '@farcaster/frame-sdk';
+
+// Define the expected Farcaster SDK actions interface
+interface FarcasterSdkActions {
+  ready: () => Promise<void>;
+  composeCast?: (options: { text: string }) => Promise<void>;
+}
 
 interface RetroSuccessProps {
   contractAddress: string;
@@ -20,7 +28,6 @@ export function RetroSuccess({
   tokenSymbol,
   description,
   displayImageUrl,
-
 }: RetroSuccessProps) {
   const copyToClipboard = () => {
     navigator.clipboard.writeText(contractAddress);
@@ -31,11 +38,51 @@ export function RetroSuccess({
     window.open(`https://zora.co/coin/${contractAddress}`, '_blank');
   };
 
-  // Go to coin details page
+  // Share on Warpcast
+  const shareOnWarpcast = async () => {
+    try {
+      // Create share text with token details and links - now with mini app link
+      const shareText = `I just created ${tokenName} (${tokenSymbol}) on Base network using 8BitMinter! 🚀\n\n${description}\n\nView on Zora: https://zora.co/coin/${contractAddress}\n\nCreate your own: https://warpcast.com/miniapps/VJFTWn45l8cA/8bitminter`;
+      
+      // Try to use dynamic import to get the SDK if in browser
+      if (typeof window !== 'undefined') {
+        try {
+          // Try to import the SDK dynamically
+          const { sdk } = await import('@farcaster/frame-sdk');
+          
+          // Use the SDK to compose a cast if available
+          if (sdk?.actions && 'composeCast' in sdk.actions) {
+            // @ts-ignore - we're checking for existence first, so this is safe
+            await sdk.actions.composeCast({ text: shareText });
+            console.log("Opened share dialog in Warpcast with SDK");
+            return;
+          }
+        } catch (importError) {
+          console.log("Failed to import Farcaster SDK, falling back to window.farcaster", importError);
+        }
+        
+        // Fall back to window.farcaster
+        if (window.farcaster?.actions && 'composeCast' in window.farcaster.actions) {
+          // @ts-ignore - we're checking for existence first, so this is safe
+          await window.farcaster.actions.composeCast({ text: shareText });
+          console.log("Opened share dialog using window.farcaster");
+          return;
+        }
+      }
+      
+      // Direct URL fallback if not in Warpcast environment
+      window.open(`https://warpcast.com/~/compose?text=${encodeURIComponent(shareText)}`, '_blank');
+    } catch (error) {
+      console.error("Error sharing to Warpcast:", error);
+      // Fallback to copy to clipboard - also updated with mini app link
+      navigator.clipboard.writeText(`I just created ${tokenName} (${tokenSymbol}) on Base network using 8BitMinter! 🚀\n\n${description}\n\nView on Zora: https://zora.co/coin/${contractAddress}\n\nCreate your own: https://warpcast.com/miniapps/VJFTWn45l8cA/8bitminter`);
+      alert("Share text copied to clipboard. You can paste it in Warpcast.");
+    }
+  };
+
+  // Go to coin details page - fixed implementation to navigate to HOLD tab
   const goToCoinDetails = () => {
-    // Find the header component and trigger tab change to "explore"
     if (typeof window !== 'undefined') {
-      // Add the contract to local storage so the Explore tab can show it
       try {
         // Get existing watched tokens or initialize empty array
         const watchedTokens = JSON.parse(localStorage.getItem('watchedTokens') || '[]');
@@ -53,21 +100,27 @@ export function RetroSuccess({
           localStorage.setItem('watchedTokens', JSON.stringify(watchedTokens));
         }
         
-        // Find RetroHeader and trigger tab change to "explore" with the contract address
-        const changeTabEvent = new CustomEvent('changeTab', { 
-          detail: { tab: 'explore', contractAddress } 
+        // Store the token details in sessionStorage
+        sessionStorage.setItem('viewTokenAddress', contractAddress);
+        sessionStorage.setItem('viewTokenDetails', 'true');
+        
+        // Dispatch an event that the CoinHolderView can listen for
+        window.dispatchEvent(new CustomEvent('viewCoinDetails', {
+          detail: { tokenAddress: contractAddress }
+        }));
+        
+        // Change the hash to include the token address
+        window.location.hash = `hold?token=${contractAddress}`;
+        
+        // Manually navigate without a full page reload if possible
+        const holdTabEvent = new CustomEvent('changeTab', {
+          detail: { tab: 'hold' }
         });
-        window.dispatchEvent(changeTabEvent);
-        
-        // Navigate to coin details
-        window.location.href = `/#explore/${contractAddress}`;
-        
-        // Reload the page to ensure tab change
-        setTimeout(() => window.location.reload(), 100);
+        window.dispatchEvent(holdTabEvent);
       } catch (error) {
-        console.error("Failed to save token to localStorage:", error);
-        // Fallback - just try to change tab
-        window.location.href = `/#explore/${contractAddress}`;
+        console.error("Failed to navigate to hold view:", error);
+        // Fallback - just try to navigate directly with hash and token parameter
+        window.location.href = `/#hold?token=${contractAddress}`;
       }
     }
   };
@@ -78,7 +131,7 @@ export function RetroSuccess({
       hideButtons={true}
       className="mb-3"
     >
-      <div className="crt-effect bg-retro-success/20 p-3 border-2 border-retro-success mb-5">
+      <div className="crt-effect bg-retro-success/20 p-3 border-2 border-retro-success mb-2">
         <div className="flex items-center">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -103,7 +156,7 @@ export function RetroSuccess({
       
       <RetroDivider text="CONTRACT INFO" />
       
-      <div className="mb-5">
+      <div className="mb-2">
         <div className="text-xs font-mono text-retro-primary mb-1">
           CONTRACT ADDRESS:
         </div>
@@ -160,29 +213,23 @@ export function RetroSuccess({
           </div>
           
           {/* Display description */}
-          <details open className="mt-3 border border-retro-primary">
-            <summary className="font-mono text-xs text-retro-primary bg-retro-dark p-1 cursor-pointer flex items-center">
-              <span className="inline-block w-2 h-2 bg-retro-accent mr-1"></span>
-              AI-GENERATED DESCRIPTION
+            <summary className="font-mono text-xs text-retro-primary bg-retro-dark cursor-pointer flex items-center">
+              DESCRIPTION
             </summary>
             <div className="p-2 bg-retro-darker">
               <p className="text-xs font-mono text-retro-accent">{description}</p>
             </div>
-          </details>
         </div>
       </div>
       
-      <div className="flex gap-3">
+      {/* Buttons section - now with 3 buttons in a grid */}
+      <div className="grid grid-cols-2 gap-3 mb-3">
         <RetroButton
           variant="outline"
           onClick={openOnZora}
           fullWidth
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter" className="mr-2">
-            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-            <polyline points="15 3 21 3 21 9"></polyline>
-            <line x1="10" y1="14" x2="21" y2="3"></line>
-          </svg>
+         
           VIEW ON ZORA
         </RetroButton>
         
@@ -190,13 +237,27 @@ export function RetroSuccess({
           onClick={goToCoinDetails}
           fullWidth
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter" className="mr-2">
-            <path d="M23 12l-7-7v4H8v6h8v4l7-7z"></path>
-            <path d="M1 5v14h15"></path>
-          </svg>
-          TRADE
+          
+          HOLD & TRADE
         </RetroButton>
       </div>
+
+      {/* Share on Warpcast button spans full width */}
+      <RetroButton
+        onClick={shareOnWarpcast}
+        variant="default"
+        fullWidth
+        className="bg-purple-600 hover:bg-purple-700 border-purple-500 flex justify-center" 
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter" className="mr-2">
+          <circle cx="18" cy="5" r="3"></circle>
+          <circle cx="6" cy="12" r="3"></circle>
+          <circle cx="18" cy="19" r="3"></circle>
+          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+        </svg>
+        SHARE ON WARPCAST
+      </RetroButton>
     </RetroStepScreen>
   );
 } 

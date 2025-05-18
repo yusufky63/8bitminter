@@ -2,57 +2,57 @@ import { processTtlgenHerImage } from './imageUtils';
 
 const MAX_RETRIES = 3;
 
-// Different coin categories and their characteristics
+// Updated coin categories to match the retro 8-bit theme
 const COIN_CATEGORIES = [
   {
-    name: "DeFi (Decentralized Finance)", 
-    features: "Decentralized lending, liquidity pools, yield farming, staking, tokenized assets",
-    themes: "Finance, economics, banking, investment",
+    name: "8-Bit Gaming", 
+    features: "Retro gaming, pixel characters, arcade experiences, game collectibles, nostalgia",
+    themes: "Arcade, classic games, pixel art, chiptune, high scores",
   },
   {
-    name: "GameFi (Gaming)",
-    features: "Play-to-earn, NFT game assets, character progression, virtual economy, tournaments",
-    themes: "Gaming, entertainment, competition, rewards",
+    name: "Pixel Art Collectibles",
+    features: "Limited edition digital art, pixel collections, retro aesthetics, digital galleries",
+    themes: "Pixel art, color palettes, sprites, dithering, visual expression",
   },
   {
-    name: "SocialFi (Social Media)",
-    features: "Content rewards, social interactions, community management, influencer economy",
-    themes: "Social media, communication, community, engagement",
+    name: "CryptoVoxel Worlds",
+    features: "Virtual land, voxel buildings, metaverse events, digital avatars, retro environments",
+    themes: "Virtual worlds, voxels, digital landscapes, virtual real estate, community spaces",
   },
   {
-    name: "GreenTech (Environmental)",
-    features: "Carbon credits, sustainable projects, environmental protection incentives, renewable energy",
-    themes: "Environment, sustainability, green energy, nature",
+    name: "Retro Music & Chiptunes",
+    features: "Digital music ownership, chiptune collections, artist support, music events",
+    themes: "8-bit music, synthesizers, chiptunes, sound chips, nostalgic melodies",
   },
   {
-    name: "AI & ML (Artificial Intelligence)",
-    features: "AI model tokenization, data marketplace, machine learning incentives, autonomous systems",
-    themes: "Artificial intelligence, technology, innovation, automation",
+    name: "Arcade Economy",
+    features: "Play-to-earn, retro games tournaments, high score rewards, arcade economy",
+    themes: "Arcade tokens, leaderboards, game rewards, competition, community challenges",
   },
   {
-    name: "NFT & Digital Art",
-    features: "Art tokenization, artist royalties, collection management, digital galleries",
-    themes: "Art, creativity, collection, culture",
+    name: "Digital Retro Fashion",
+    features: "Pixel wearables, retro-styled avatars, digital fashion items, nostalgic accessories",
+    themes: "80s/90s fashion, pixel clothing, digital accessories, avatar customization",
   },
   {
-    name: "Metaverse & VR",
-    features: "Virtual real estate, digital assets, avatar customization, virtual events",
-    themes: "Virtual reality, digital world, interaction, experience",
+    name: "8-Bit DeFi",
+    features: "Simplified finance, retro banking interfaces, pixel-styled investments, farming",
+    themes: "Financial pixels, retro banking, simplified economics, accessible finance",
   },
   {
-    name: "IoT (Internet of Things)",
-    features: "Device networks, sensor data, smart contracts, automation systems",
-    themes: "Connectivity, automation, smart devices, data",
+    name: "Retro Social Clubs",
+    features: "Community membership, retro chat rooms, digital hangouts, pixel avatars",
+    themes: "BBS nostalgia, pixel forums, digital clubhouses, community governance",
   },
   {
-    name: "Privacy & Security",
-    features: "Private transactions, data encryption, secure communication, identity verification",
-    themes: "Privacy, security, protection, encryption",
+    name: "Pixel Pets & Companions",
+    features: "Digital pets, creature training, pixel evolution, companion collection",
+    themes: "Tamagotchi-inspired, creature care, evolution, collecting, companions",
   },
   {
-    name: "DAO & Governance",
-    features: "Community management, voting systems, protocol governance, incentive mechanisms",
-    themes: "Governance, democracy, decision-making, community",
+    name: "Retro Tech & Gadgets",
+    features: "Digital gadget collections, retro hardware tributes, tech memorabilia",
+    themes: "Vintage computers, game consoles, pixel gadgets, tech nostalgia",
   },
 ];
 
@@ -299,8 +299,8 @@ export const generateImageWithAI = async (
             body: JSON.stringify({
               model: "black-forest-labs/FLUX.1-schnell-Free", // Use SDXL for better pixel art
               prompt: prompt,
-              width: 512,
-              height: 512,
+              width: 768,
+              height: 768,
               n: 1,
               response_format: "url",
               negative_prompt: "text, words, letters, numbers, low quality, blurry, realistic, photorealistic, 3D rendering, shading, high resolution details, smooth gradients",

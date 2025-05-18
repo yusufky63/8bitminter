@@ -111,6 +111,63 @@ export default function CoinHolderView() {
     initApp();
   }, []);
 
+  // Check for token details navigation flag on load
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Function to check URL for token address
+      const checkUrlForTokenAddress = () => {
+        // Check if hash includes a token parameter
+        const hash = window.location.hash;
+        if (hash.includes('token=')) {
+          try {
+            const tokenParam = hash.split('token=')[1];
+            const tokenAddress = tokenParam.split('&')[0]; // Get the token address part
+            if (tokenAddress && tokenAddress.startsWith('0x')) {
+              console.log('Found token address in URL:', tokenAddress);
+              setSelectedTokenAddress(tokenAddress);
+              setViewingDetails(true);
+              return true;
+            }
+          } catch (e) {
+            console.error('Error parsing token from URL:', e);
+          }
+        }
+        return false;
+      };
+
+      // Check sessionStorage first
+      const tokenAddress = sessionStorage.getItem('viewTokenAddress');
+      const viewTokenDetails = sessionStorage.getItem('viewTokenDetails');
+      
+      if (tokenAddress && viewTokenDetails === 'true') {
+        setSelectedTokenAddress(tokenAddress);
+        setViewingDetails(true);
+        // Clear the flag so we don't keep showing details on refresh
+        sessionStorage.removeItem('viewTokenDetails');
+      } else {
+        // Try URL parameter as a fallback
+        checkUrlForTokenAddress();
+      }
+      
+      // Also listen for viewCoinDetails event which is fired from RetroSuccess component
+      const handleViewCoinDetails = (event: CustomEvent) => {
+        if (event.detail && event.detail.tokenAddress) {
+          console.log('Received viewCoinDetails event:', event.detail.tokenAddress);
+          setSelectedTokenAddress(event.detail.tokenAddress);
+          setViewingDetails(true);
+        }
+      };
+      
+      // Add event listener
+      window.addEventListener('viewCoinDetails', handleViewCoinDetails as EventListener);
+      
+      // Cleanup
+      return () => {
+        window.removeEventListener('viewCoinDetails', handleViewCoinDetails as EventListener);
+      };
+    }
+  }, []);
+
   // Fetch user profile when connected
   useEffect(() => {
     if (isConnected && address) {

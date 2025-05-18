@@ -281,6 +281,31 @@ export const validateTradeBalance = async (
           )} ETH (trade + gas)`,
         };
       }
+    } else if (tradeType === "sell") {
+      // Check token balance for sells
+      const tokenBalance = await checkTokenBalance(userAddress, coinAddress, publicClient);
+      
+      if (tokenBalance < amount) {
+        return {
+          isValid: false,
+          currentBalance: tokenBalance,
+          message: `Insufficient token balance. Your balance: ${ethers.formatUnits(
+            tokenBalance, 18
+          )}, required: ${ethers.formatUnits(amount, 18)}`,
+        };
+      }
+      
+      // Also check if user has enough ETH for gas
+      const ethBalance = await checkETHBalance(userAddress, publicClient);
+      const gasReserve = 1n * 10n ** 14n; // 0.0001 ETH for gas
+      
+      if (ethBalance < gasReserve) {
+        return {
+          isValid: false,
+          currentBalance: ethBalance,
+          message: `Insufficient ETH for gas fees. You need at least 0.0001 ETH for gas.`,
+        };
+      }
     }
     
     return {

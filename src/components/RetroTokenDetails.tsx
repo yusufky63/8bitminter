@@ -106,8 +106,8 @@ export function RetroTokenDetails({
         className="mb-4 overflow-hidden"
       >
         {aiSuggestion && (
-          <div className="mb-6 p-4 rounded-sm border border-retro-primary bg-gradient-to-r from-retro-darker  transform transition-all duration-300 hover:shadow-[0_0_15px_rgba(255,107,53,0.3)] hover:scale-[1.01]">
-            <h3 className="text-retro-secondary text-sm font-bold mb-2 flex items-center">
+          <div className="mb-4 p-1 border-2 border-retro-primary bg-gradient-to-r from-retro-darker  transform transition-all duration-300 hover:shadow-[0_0_15px_rgba(255,107,53,0.3)] hover:scale-[1.01]">
+            <h3 className="text-retro-secondary text-sm font-bold mb-1 flex items-center">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
                 <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
                 <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
@@ -115,7 +115,7 @@ export function RetroTokenDetails({
               </svg>
               AI Suggestion
             </h3>
-            <div className="text-retro-accent text-sm leading-relaxed  p-3 rounded-md">{aiSuggestion.description}</div>
+            <div className="text-retro-accent text-sm leading-relaxed  p-1 rounded-md">{aiSuggestion.description}</div>
           </div>
         )}
         

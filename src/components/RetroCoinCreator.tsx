@@ -611,7 +611,7 @@ export default function RetroCoinCreator() {
         console.log(`User selected purchase amount: ${purchaseAmount} wei`);
         
         // Minimum amount needed for the transaction (purchase amount + gas buffer)
-        const gasBuffer = parseEther("0.002"); // ~0.002 ETH for gas
+        const gasBuffer = parseEther("0.0002"); // ~0.0002 ETH for gas
         const minimumRequired = purchaseAmount + gasBuffer;
         
         // Check if user has enough balance for transaction
@@ -642,7 +642,7 @@ export default function RetroCoinCreator() {
           payoutRecipient: walletAddress,
           initialPurchaseWei: isPurchaseEnabled ? parseEther(selectedPurchaseAmount) : BigInt(0),
           owners: ownersAddresses.length > 0 ? ownersAddresses : undefined
-        }, walletClient, publicClient, { gasMultiplier: 120 }) as CoinCreationResult;
+        }, walletClient, publicClient, { gasMultiplier: 100 }) as CoinCreationResult;
         
         console.log("Token created successfully:", result);
         
