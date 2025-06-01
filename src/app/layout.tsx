@@ -26,7 +26,7 @@ export default function RootLayout({
     version: "next",
     imageUrl: `${baseUrl}/opengraph-image.png`,
     button: {
-      title: "Start Minting",
+      title: "Create Coin",
       action: {
         type: "launch_frame",
         name: "8BitCoiner",
@@ -72,7 +72,7 @@ export default function RootLayout({
         {/* Farcaster Frame configuration */}
         <meta name="fc:frame" content={JSON.stringify(frameJson)} />
         <meta name="fc:frame:image" content={`${baseUrl}/opengraph-image.png`} />
-        <meta name="fc:frame:button:1" content="Start Minting" />
+        <meta name="fc:frame:button:1" content="Create Coin" />
 
         {/* Allow embedding from anywhere */}
         <meta httpEquiv="X-Frame-Options" content="ALLOWALL" />
