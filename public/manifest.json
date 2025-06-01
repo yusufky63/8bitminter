@@ -1,6 +1,6 @@
 {
-  "name": "8BitMinter",
-  "short_name": "8BitMinter",
+  "name": "8BitCoiner",
+  "short_name": "8BitCoiner",
   "description": "Create and mint your own 8-bit style tokens on the blockchain.",
   "icons": [
     {
@@ -21,13 +21,13 @@
   "orientation": "portrait",
   "scope": "/",
   "miniapp": {
-    "name": "8BitMinter",
+    "name": "8BitCoiner",
     "description": "Create and mint your own 8-bit style tokens on the blockchain.",
     "icon": "/logo.png",
     "platforms": ["farcaster"],
     "categories": ["creation"],
     "author": {
-      "name": "8BitMinter Team"
+      "name": "8BitCoiner Team"
     },
     "splash": {
       "background": "#181028",

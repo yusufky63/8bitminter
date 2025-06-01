@@ -126,7 +126,7 @@ export async function processImageAndUploadToIPFS(imageUrl, name, symbol, descri
         const metadata = {
             name,
             symbol,
-            description: description || `${name} (${symbol}) - A token created with 8BitMinter`,
+            description: description || `${name} (${symbol}) - A token created with 8BitCoiner`,
             image: imageUrl
         };
         
@@ -201,7 +201,7 @@ export async function processTtlgenHerImage(imageUrl, tokenName, tokenSymbol, to
     // Metadata with actual token details (AI description is prioritized)
     const metadata = {
       name: tokenName || "Token", 
-      description: tokenDescription || `${tokenName} token - Created with 8BitMinter`,
+      description: tokenDescription || `${tokenName} token - Created with 8BitCoiner`,
       symbol: tokenSymbol,
       image: imageUrl
     };

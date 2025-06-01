@@ -3,7 +3,7 @@ import React, { useContext } from "react";
 import { sdk } from '@farcaster/frame-sdk';
 
 /**
- * Complete Farcaster SDK integration for 8BitMinter
+ * Complete Farcaster SDK integration for 8BitCoiner
  */
 
 // Define the Farcaster context types

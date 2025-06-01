@@ -6,7 +6,7 @@
   },
   "frame": {
     "version": "1",
-    "name": "8BitMinter",
+    "name": "8BitCoiner",
     "description": "Create and mint your own 8-bit style tokens on the blockchain.",
     "iconUrl": "https://8bitminter.vercel.app/logo.png",
     "homeUrl": "https://8bitminter.vercel.app",

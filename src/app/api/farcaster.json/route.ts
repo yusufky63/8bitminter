@@ -13,7 +13,7 @@ export async function GET() {
     },
     frame: {
       version: "1",
-      name: "8BitMinter",
+      name: "8BitCoiner",
       description: "Create and mint your own 8-bit style tokens on the blockchain.",
       iconUrl: "https://8bitminter.vercel.app/logo.png",
       homeUrl: appUrl,
@@ -23,7 +23,7 @@ export async function GET() {
       ],
       tags: ["nft", "tokens", "blockchain", "web3", "8bit"],
       primaryCategory: "art-creativity",
-      buttonTitle: "Launch 8BitMinter",
+      buttonTitle: "Launch 8BitCoiner",
       splashImageUrl: "https://8bitminter.vercel.app/logo.png",
       splashBackgroundColor: "#181028",
       webhookUrl: "https://8bitminter.vercel.app/api/webhook"

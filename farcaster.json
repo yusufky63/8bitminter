@@ -6,7 +6,7 @@
   },
   "frame": {
     "version": "1",
-    "name": "8BitMinter",
+    "name": "8BitCoiner",
     "description": "Create and mint your own 8-bit style tokens on the blockchain.",
     "imageUrl": "https://8bitminter.vercel.app/opengraph-image.png",
     "homeUrl": "https://8bitminter.vercel.app",
@@ -18,7 +18,7 @@
     "screenshotUrls": [
       "https://8bitminter.vercel.app/images/screenshot1.png"
     ],
-    "ogTitle": "8BitMinter",
+    "ogTitle": "8BitCoiner",
     "ogDescription": "Create retro-styled tokens on the blockchain with AI-generated art",
     "ogImageUrl": "https://8bitminter.vercel.app/opengraph-image.png"
   }

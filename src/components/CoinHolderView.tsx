@@ -12,6 +12,7 @@ interface TokenBalance {
   name: string;
   symbol: string;
   balance: string;
+  rawBalance: string;
   imageUrl?: string;
   description?: string;
   totalSupply?: string;
@@ -85,9 +86,33 @@ interface ProfileBalanceResponse {
   }
 }
 
+// TokenImage component to handle fallback cleanly
+const TokenImage = ({ imageUrl, symbol, name }: { imageUrl?: string; symbol: string; name: string }) => {
+  const [imageError, setImageError] = useState(false);
+
+  if (!imageUrl || imageError) {
+    return (
+      <div className="w-10 h-10 bg-retro-primary/10 border border-retro-primary/50 flex items-center justify-center rounded">
+        <span className="text-retro-primary text-sm font-bold pixelated">{symbol.charAt(0)}</span>
+      </div>
+    );
+  }
+
+  return (
+    <Image 
+      src={imageUrl} 
+      alt={name} 
+      width={40}
+      height={40}
+      className="w-10 h-10 rounded border border-retro-primary/50 pixelated"
+      unoptimized
+      onError={() => setImageError(true)}
+    />
+  );
+};
+
 export default function CoinHolderView() {
   const { address, isConnected } = useAccount();
-  const publicClient = usePublicClient();
   const [allTokens, setAllTokens] = useState<TokenBalance[]>([]);
   const [tokens, setTokens] = useState<TokenBalance[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -97,19 +122,35 @@ export default function CoinHolderView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<"balance" | "marketCap" | "holders" | "volume" | "name" | "usdValue">("usdValue");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [ethToUsdRate, setEthToUsdRate] = useState<number>(3000); // Add ETH price state
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const tokensPerPage = 10;
 
-  // Initialize app without Farcaster SDK
-  useEffect(() => {
-    const initApp = async () => {
-      // Basic app initialization if needed
-    };
-    
-    initApp();
+  // Fetch ETH price in USD
+  const fetchEthPrice = React.useCallback(async () => {
+    try {
+      const response = await fetch(
+        "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
+      );
+      const data = await response.json();
+      if (data && data.ethereum && data.ethereum.usd) {
+        setEthToUsdRate(data.ethereum.usd);
+      }
+    } catch (error) {
+      console.error("Failed to fetch ETH price:", error);
+      // Use fallback price if API fails
+      setEthToUsdRate(3000);
+    }
   }, []);
+
+  // Fetch ETH price on component mount
+  React.useEffect(() => {
+    fetchEthPrice();
+  }, [fetchEthPrice]);
 
   // Check for token details navigation flag on load
   useEffect(() => {
@@ -244,6 +285,50 @@ export default function CoinHolderView() {
     }
   };
 
+  // Calculate USD value of token balance - Fixed with proper decimal handling
+  const calculateUSDValue = (token: TokenBalance): string => {
+    try {
+      // Use raw balance for accurate calculation (usually in wei format - 18 decimals)
+      const rawBalance = parseFloat(token.rawBalance);
+      
+      if (isNaN(rawBalance) || rawBalance <= 0) return "0.00";
+      
+      // Convert from wei to readable format (assuming 18 decimals for most tokens)
+      const balance = rawBalance / (10 ** 18);
+      
+      // Classic calculation: Token Price = Market Cap / Total Supply
+      if (token.marketCap && token.totalSupply) {
+        const marketCap = parseFloat(token.marketCap);
+        const totalSupply = parseFloat(token.totalSupply);
+        
+        if (!isNaN(marketCap) && !isNaN(totalSupply) && totalSupply > 0 && marketCap > 0) {
+          // Market cap is in USD, calculate token price
+          const tokenPriceInUsd = marketCap / totalSupply;
+          const usdValue = balance * tokenPriceInUsd;
+          
+          // Format with abbreviations
+          if (usdValue >= 1_000_000_000) {
+            return (usdValue / 1_000_000_000).toFixed(2) + 'B';
+          } else if (usdValue >= 1_000_000) {
+            return (usdValue / 1_000_000).toFixed(2) + 'M';
+          } else if (usdValue >= 1_000) {
+            return (usdValue / 1_000).toFixed(2) + 'K';
+          } else if (usdValue >= 0.01) {
+            return usdValue.toFixed(2);
+          } else if (usdValue > 0) {
+            return "< 0.01";
+          }
+        }
+      }
+      
+      // If no market cap data available, return N/A
+      return "N/A";
+    } catch (e) {
+      console.error("Error calculating USD value:", e);
+      return "N/A";
+    }
+  };
+
   // Completely revised balance formatter to correctly handle all number formats
   const formatBalance = (rawBalance: string): string => {
     try {
@@ -293,24 +378,89 @@ export default function CoinHolderView() {
     }
   };
 
+  // Sort tokens function
+  const sortTokens = (tokenList: TokenBalance[], sortBy: string, order: string): TokenBalance[] => {
+    return [...tokenList].sort((a, b) => {
+      let aValue: number | string = 0;
+      let bValue: number | string = 0;
+
+      switch (sortBy) {
+        case "balance":
+          // Use raw balance for more accurate sorting
+          aValue = parseFloat(a.rawBalance) || 0;
+          bValue = parseFloat(b.rawBalance) || 0;
+          break;
+        case "marketCap":
+          aValue = parseFloat(a.marketCap || "0");
+          bValue = parseFloat(b.marketCap || "0");
+          break;
+        case "holders":
+          aValue = a.holders || 0;
+          bValue = b.holders || 0;
+          break;
+        case "volume":
+          aValue = parseFloat(a.volumeDay || "0");
+          bValue = parseFloat(b.volumeDay || "0");
+          break;
+        case "name":
+          aValue = a.symbol.toLowerCase();
+          bValue = b.symbol.toLowerCase();
+          break;
+        case "usdValue":
+          // Use the improved calculateUSDValue function for comparison
+          const aUsd = calculateUSDValue(a);
+          const bUsd = calculateUSDValue(b);
+          
+          // Parse the USD values properly, handling abbreviations
+          const parseUsdValue = (usdStr: string): number => {
+            if (usdStr === "N/A" || usdStr === "< 0.01") return 0;
+            
+            const cleanStr = usdStr.replace(/[^\d.-]/g, '');
+            let value = parseFloat(cleanStr) || 0;
+            
+            if (usdStr.includes('B')) value *= 1_000_000_000;
+            else if (usdStr.includes('M')) value *= 1_000_000;
+            else if (usdStr.includes('K')) value *= 1_000;
+            
+            return value;
+          };
+          
+          aValue = parseUsdValue(aUsd);
+          bValue = parseUsdValue(bUsd);
+          break;
+        default:
+          return 0;
+      }
+
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        return order === "desc" ? bValue.localeCompare(aValue) : aValue.localeCompare(bValue);
+      }
+
+      return order === "desc" ? (bValue as number) - (aValue as number) : (aValue as number) - (bValue as number);
+    });
+  };
+
   // Filter tokens based on search query
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      // If no search query, just use pagination on all tokens
-      setTokens(getPageTokens(allTokens, currentPage));
-      return;
+    let filteredTokens = allTokens;
+    
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const lowerQuery = searchQuery.toLowerCase().trim();
+      filteredTokens = allTokens.filter(token => 
+        token.name.toLowerCase().includes(lowerQuery) || 
+        token.symbol.toLowerCase().includes(lowerQuery) ||
+        token.address.toLowerCase().includes(lowerQuery)
+      );
     }
     
-    const lowerQuery = searchQuery.toLowerCase().trim();
-    const filtered = allTokens.filter(token => 
-      token.name.toLowerCase().includes(lowerQuery) || 
-      token.symbol.toLowerCase().includes(lowerQuery) ||
-      token.address.toLowerCase().includes(lowerQuery)
-    );
+    // Apply sorting
+    const sortedTokens = sortTokens(filteredTokens, sortBy, sortOrder);
     
-    setCurrentPage(1); // Reset to first page when searching
-    setTokens(getPageTokens(filtered, 1));
-  }, [searchQuery, allTokens, currentPage]);
+    // Reset to first page when filtering/sorting
+    setCurrentPage(1);
+    setTokens(getPageTokens(sortedTokens, 1));
+  }, [searchQuery, allTokens, sortBy, sortOrder]);
 
   // Get tokens for current page
   const getPageTokens = (tokenArray: TokenBalance[], page: number) => {
@@ -318,36 +468,36 @@ export default function CoinHolderView() {
     return tokenArray.slice(startIndex, startIndex + tokensPerPage);
   };
 
-  // Handle page change
+  // Handle page change with sorting
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    if (!searchQuery.trim()) {
-      setTokens(getPageTokens(allTokens, page));
-    } else {
-      // If there's a search query, we need to filter first
+    
+    let filteredTokens = allTokens;
+    if (searchQuery.trim()) {
       const lowerQuery = searchQuery.toLowerCase().trim();
-      const filtered = allTokens.filter(token => 
+      filteredTokens = allTokens.filter(token => 
         token.name.toLowerCase().includes(lowerQuery) || 
         token.symbol.toLowerCase().includes(lowerQuery) ||
         token.address.toLowerCase().includes(lowerQuery)
       );
-      setTokens(getPageTokens(filtered, page));
     }
+    
+    const sortedTokens = sortTokens(filteredTokens, sortBy, sortOrder);
+    setTokens(getPageTokens(sortedTokens, page));
   };
 
-  // Calculate total pages
+  // Calculate total pages with sorting
   const getTotalPages = () => {
-    if (!searchQuery.trim()) {
-      return Math.ceil(allTokens.length / tokensPerPage);
-    } else {
+    let filteredTokens = allTokens;
+    if (searchQuery.trim()) {
       const lowerQuery = searchQuery.toLowerCase().trim();
-      const filtered = allTokens.filter(token => 
+      filteredTokens = allTokens.filter(token => 
         token.name.toLowerCase().includes(lowerQuery) || 
         token.symbol.toLowerCase().includes(lowerQuery) ||
         token.address.toLowerCase().includes(lowerQuery)
       );
-      return Math.ceil(filtered.length / tokensPerPage);
     }
+    return Math.ceil(filteredTokens.length / tokensPerPage);
   };
 
   // Reload balances
@@ -366,22 +516,25 @@ export default function CoinHolderView() {
       if (response?.data?.profile?.coinBalances?.edges) {
         const balances = response.data.profile.coinBalances.edges
           .filter(edge => edge.node && edge.node.coin && parseFloat(edge.node.balance) > 0)
-          .map(edge => ({
-            address: edge.node.coin.address,
-            name: edge.node.coin.name,
-            symbol: edge.node.coin.symbol,
-            balance: formatBalance(edge.node.balance),
-            imageUrl: edge.node.coin.imageURI || 
-                     edge.node.coin.mediaContent?.previewImage?.medium ||
-                     edge.node.coin.mediaContent?.image?.medium,
-            description: edge.node.coin.description,
-            totalSupply: edge.node.coin.totalSupply,
-            creatorAddress: edge.node.coin.creatorAddress,
-            creatorName: edge.node.coin.creatorProfile?.handle,
-            marketCap: edge.node.coin.marketCap,
-            volumeDay: edge.node.coin.volume24h,
-            holders: edge.node.coin.uniqueHolders
-          }));
+          .map(edge => {
+            return {
+              address: edge.node.coin.address,
+              name: edge.node.coin.name,
+              symbol: edge.node.coin.symbol,
+              balance: formatBalance(edge.node.balance),
+              rawBalance: edge.node.balance,
+              imageUrl: edge.node.coin.imageURI || 
+                       edge.node.coin.mediaContent?.previewImage?.medium ||
+                       edge.node.coin.mediaContent?.image?.medium,
+              description: edge.node.coin.description,
+              totalSupply: edge.node.coin.totalSupply,
+              creatorAddress: edge.node.coin.creatorAddress,
+              creatorName: edge.node.coin.creatorProfile?.handle,
+              marketCap: edge.node.coin.marketCap,
+              volumeDay: edge.node.coin.volume24h,
+              holders: edge.node.coin.uniqueHolders
+            };
+          });
         
         setAllTokens(balances);
         setTokens(getPageTokens(balances, currentPage));
@@ -439,15 +592,26 @@ export default function CoinHolderView() {
   }
 
   return (
-    <div className="retro-container p-2">
-      <h2 className="retro-header text-sm mb-3">Your Token Holdings</h2>
+    <div className="retro-container p-2 border-2 border-retro-primary">
+      {/* Header with enhanced styling */}
+      <div className="mb-4 bg-gradient-to-r from-retro-primary/20 to-retro-primary/5 p-3 border-2 border-retro-primary shadow-[0_0_10px_rgba(255,107,53,0.1)]">
+        <h2 className="retro-header text-sm mb-0 text-retro-primary font-bold pixelated flex items-center">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          YOUR PORTFOLIO
+        </h2>
+      </div>
       
-      {/* Profile section */}
+      {/* Profile section with modern retro design */}
       <div className="mb-4">
         {isConnected ? (
           <>
             {isProfileLoading ? (
-              <div className="flex justify-center my-2">
+              <div className="flex justify-center my-4 bg-black/20 p-4 border-2 border-retro-primary">
                 <div className="retro-loading">
                   <div></div>
                   <div></div>
@@ -455,173 +619,243 @@ export default function CoinHolderView() {
                 </div>
               </div>
             ) : profileError ? (
-              <div className="text-center py-2">
-                <p className="text-retro-error text-xs mb-2">{profileError}</p>
+              <div className="text-center py-4 bg-gradient-to-br from-red-900/20 to-black/40 border-2 border-red-400">
+                <p className="text-red-400 text-xs mb-3 pixelated">{profileError}</p>
                 <RetroButton
                   onClick={handleRetryProfile}
-                  className="text-xs py-1"
+                  className="text-xs py-2 px-4 bg-red-500 hover:bg-red-400 border-red-400"
                 >
-                  Retry
+                  RETRY CONNECTION
                 </RetroButton>
               </div>
             ) : userProfile ? (
-              <div className="retro-card p-2 mb-3">
-                <div className="flex items-center gap-3">
+              <div className="bg-gradient-to-br from-retro-primary/10 via-retro-primary/5 to-black/40 p-4 border-2 border-retro-primary shadow-[0_0_15px_rgba(255,107,53,0.2)]">
+                <div className="flex items-center gap-4">
                   {userProfile.avatar ? (
                     <Image 
                       src={userProfile.avatar}
                       alt={userProfile.displayName || "Profile"} 
-                      width={48}
-                      height={48}
-                      className="w-12 h-12 rounded-full border-2 border-retro-primary"
+                      width={56}
+                      height={56}
+                      className="w-14 h-14 rounded-lg border-2 border-retro-primary shadow-[0_0_8px_rgba(255,107,53,0.3)] pixelated"
                       unoptimized
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
                         target.onerror = null;
-                        target.src = "https://i.imgur.com/HeIi0wU.png"; // Default avatar
+                        target.src = "https://i.imgur.com/HeIi0wU.png";
                       }}
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-retro-dark border-2 border-retro-primary flex items-center justify-center">
-                      <span className="text-retro-primary text-lg font-bold">
+                    <div className="w-14 h-14 rounded-lg bg-retro-primary/20 border-2 border-retro-primary flex items-center justify-center shadow-[0_0_8px_rgba(255,107,53,0.3)]">
+                      <span className="text-retro-primary text-xl font-bold pixelated">
                         {userProfile.displayName?.charAt(0) || address?.charAt(0) || '?'}
                       </span>
                     </div>
                   )}
                   
                   <div className="flex-1">
-                    <div className="flex items-center">
-                      <h3 className="text-sm font-bold text-retro-primary mr-1">
-                        {userProfile.displayName || "Anonymous"}
+                    <div className="flex items-center mb-1">
+                      <h3 className="text-lg font-bold text-retro-primary mr-2 pixelated">
+                        {userProfile.displayName || "Anonymous Holder"}
                       </h3>
                       {userProfile.verified && (
-                        <span className="text-xs text-retro-accent">✓</span>
+                        <div className="w-5 h-5 bg-retro-primary rounded-full flex items-center justify-center">
+                          <span className="text-black text-xs font-bold">✓</span>
+                        </div>
                       )}
                     </div>
                     
                     {userProfile.handle && (
-                      <div className="text-xs text-retro-secondary">@{userProfile.handle}</div>
+                      <div className="text-sm text-retro-secondary mb-2 font-mono">@{userProfile.handle}</div>
                     )}
                     
-                    <div className="grid grid-cols-1 gap-y-1 mt-2 text-xs">
-                      <div>
-                        <span className="text-retro-secondary">Address:</span>{" "}
-                        <span className="text-retro-accent truncate max-w-[120px] inline-block align-bottom">
-                          {address ? `${address.substring(0, 6)}...${address.substring(address.length - 4)}` : 'N/A'}
+                    <div className="grid grid-cols-1 gap-1">
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-retro-secondary pixelated">WALLET:</span>
+                        <span className="text-retro-accent font-mono bg-black/30 px-2 py-1 border border-retro-primary/30 rounded">
+                          {address ? `${address.substring(0, 8)}...${address.substring(address.length - 6)}` : 'N/A'}
                         </span>
+                        <button
+                          onClick={() => navigator.clipboard.writeText(address || '')}
+                          className="text-retro-accent hover:text-retro-primary transition-colors"
+                          title="Copy address"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                          </svg>
+                        </button>
                       </div>
                     </div>
                   </div>
+                  
+                
                 </div>
               </div>
             ) : (
-              <div className="text-center py-2 mb-2 border border-retro-primary bg-retro-dark/20">
-                <p className="text-xs text-retro-secondary">No profile information available</p>
+              <div className="text-center py-4 border-2 border-retro-primary bg-black/20">
+                <p className="text-xs text-retro-secondary pixelated">NO PROFILE DATA AVAILABLE</p>
               </div>
             )}
           </>
         ) : (
-          <div className="text-center py-3 mb-2 border border-retro-primary bg-retro-dark/20">
-            <p className="text-sm text-retro-secondary mb-2">Connect your wallet to view your profile and token holdings</p>
+          <div className="text-center py-6 border-2 border-retro-primary bg-gradient-to-br from-retro-primary/5 to-black/40">
+            <div className="w-16 h-16 mx-auto mb-4 bg-retro-primary/20 border-2 border-retro-primary rounded-lg flex items-center justify-center">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-retro-primary">
+                <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>
+                <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
+              </svg>
+            </div>
+            <p className="text-sm text-retro-primary mb-2 pixelated font-bold">WALLET NOT CONNECTED</p>
+            <p className="text-xs text-retro-secondary">Connect your wallet to view your token portfolio</p>
           </div>
         )}
       </div>
       
-      {/* Search bar and reload button */}
-      <div className="flex gap-2 mb-3">
-        <div className="flex-1">
+      {/* Enhanced search bar and controls */}
+      <div className="flex gap-2 mb-4">
+        <div className="flex-1 relative ">
+          
           <input
             type="text"
-            className="retro-input w-full text-xs py-1"
-            placeholder="Search tokens..."
+            className="retro-input w-full text-xs py-2 pl-8 pr-3 border-2 border-retro-primary bg-black/60 text-retro-accent placeholder-retro-secondary/60"
+            placeholder="Search by name, symbol, or address..."
             value={searchQuery}
             onChange={handleSearchChange}
           />
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute right-2 top-1/2 transform -translate-y-1/2 text-retro-secondary">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="M21 21l-4.35-4.35"/>
+          </svg>
+          
         </div>
         <RetroButton 
           onClick={handleReloadBalances}
           isLoading={isLoading}
-          className="text-xs py-1"
+          className="flex items-center text-xs py-2 px-3 bg-retro-primary hover:bg-retro-primary/80 border-retro-primary transition-all duration-200"
           disabled={!isConnected}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter" className="mr-1">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
             <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
           </svg>
-        
+         
         </RetroButton>
       </div>
+
+      {/* Filter/Sort Options */}
+      {isConnected && allTokens.length > 0 && (
+        <div className="mb-3 bg-black/20 p-2 border border-retro-primary">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-xs text-retro-secondary pixelated">SORT BY:</span>
+            
+            {/* Sort by dropdown */}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="text-xs px-2 py-1 bg-black/60 border border-retro-primary text-retro-accent focus:border-retro-accent focus:outline-none"
+            >
+              <option value="usdValue">USD VALUE</option>
+              <option value="balance">TOKEN AMOUNT</option>
+              <option value="marketCap">MARKET CAP</option>
+              <option value="holders">HOLDERS</option>
+              <option value="volume">24H VOLUME</option>
+              <option value="name">NAME (A-Z)</option>
+            </select>
+            
+            {/* Sort order dropdown */}
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as any)}
+              className="text-xs px-2 py-1 bg-black/60 border border-retro-primary text-retro-accent focus:border-retro-accent focus:outline-none"
+            >
+              <option value="desc">HIGH TO LOW</option>
+              <option value="asc">LOW TO HIGH</option>
+            </select>
+          </div>
+        </div>
+      )}
       
-      {/* Token holdings list */}
+      {/* Results info */}
+      {isConnected && !isLoading && (
+        <div className="mb-3 flex justify-between items-center text-xs">
+          <span className="text-retro-secondary pixelated">
+            {searchQuery.trim() ? `SEARCH RESULTS: ${tokens.length}` : `TOTAL TOKENS: ${allTokens.length}`}
+          </span>
+          {searchQuery.trim() && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="text-retro-accent hover:text-retro-primary transition-colors pixelated"
+            >
+              CLEAR SEARCH
+            </button>
+          )}
+        </div>
+      )}
+      
+      {/* Modern token holdings grid */}
       {isLoading ? (
-        <div className="flex justify-center my-4">
-          <div className="retro-loading">
+        <div className="flex flex-col items-center justify-center py-8 border-2 border-retro-primary bg-black/20">
+          <div className="retro-loading mb-4">
             <div></div>
             <div></div>
             <div></div>
           </div>
+          <p className="text-retro-secondary text-xs pixelated">LOADING PORTFOLIO...</p>
         </div>
       ) : tokens.length > 0 ? (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 gap-2">
           {tokens.map((token, index) => (
             <div
               key={token.address}
-              className="retro-card p-2 hover:border-retro-accent transition-colors cursor-pointer"
+              className="group bg-black/40 p-3 border border-retro-primary hover:border-retro-accent transition-all duration-200 cursor-pointer hover:bg-retro-primary/5"
               onClick={() => handleTokenClick(token.address)}
             >
-              <div className="flex items-center gap-2">
-                {token.imageUrl ? (
-                  <Image 
-                    src={token.imageUrl} 
-                    alt={token.name} 
-                    width={40}
-                    height={40}
-                    className="w-10 h-10 rounded-md pixelated"
-                    unoptimized
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.onerror = null;
-                      target.style.display = "none";
-                      const parent = target.parentNode;
-                      if (parent) {
-                        const placeholder = document.createElement("div");
-                        placeholder.className = "w-10 h-10 bg-retro-primary/5 flex items-center justify-center rounded-md";
-                        placeholder.innerHTML = `<span class="text-retro-primary text-md font-bold">${token.symbol.charAt(0)}</span>`;
-                        parent.appendChild(placeholder);
-                      }
-                    }}
-                  />
-                ) : (
-                  <div className="w-10 h-10 bg-retro-primary/5 flex items-center justify-center rounded-md">
-                    <span className="text-retro-primary text-md font-bold">{token.symbol.charAt(0)}</span>
-                  </div>
-                )}
+              <div className="flex items-center gap-3">
+                {/* Token Icon */}
+                <TokenImage imageUrl={token.imageUrl} symbol={token.symbol} name={token.name} />
                 
-                <div className="flex-1">
+                {/* Token Info */}
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-semibold text-retro-primary">{token.symbol}</h3>
-                      <div className="text-xs text-retro-secondary truncate max-w-[150px]">{token.name}</div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-retro-primary pixelated">
+                        {token.symbol.length > 8 ? `${token.symbol.substring(0, 8)}...` : token.symbol}
+                      </h3>
+                      <span className="text-xs text-retro-secondary font-mono truncate max-w-[100px]">
+                        {token.name.length > 15 ? `${token.name.substring(0, 15)}...` : token.name}
+                      </span>
                     </div>
-                    
                     <div className="text-right">
-                      <div className="text-sm text-retro-accent font-pixel-md">{token.balance}</div>
+                      <div className="text-sm font-bold text-retro-accent pixelated">
+                        ${calculateUSDValue(token)}
+                      </div>
+                      <div className="text-xs text-retro-secondary opacity-60">
+                        {token.balance} {token.symbol}
+                      </div>
                     </div>
                   </div>
-
-                  <div className="flex mt-1 justify-between text-xs">
+                  
+                  {/* Compact metrics row */}
+                  <div className="flex items-center gap-4 mt-1 text-xs text-retro-secondary">
                     {token.marketCap && (
-                      <span className="text-retro-secondary">
-                        <span className="opacity-60">MC:</span> {formatCurrency(token.marketCap)}
+                      <span>
+                        <span className="opacity-60">MC:</span> ${formatCurrency(token.marketCap)}
                       </span>
                     )}
                     {token.volumeDay && (
-                      <span className="text-retro-secondary">
-                        <span className="opacity-60">VOL:</span> {formatCurrency(token.volumeDay)}
+                      <span>
+                        <span className="opacity-60">24H:</span> ${formatCurrency(token.volumeDay)}
                       </span>
                     )}
                     {token.holders !== undefined && (
-                      <span className="text-retro-secondary">
-                        <span className="opacity-60">HOLD:</span> {token.holders}
+                      <span className="flex items-center gap-1">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-60">
+                          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                          <circle cx="9" cy="7" r="4"/>
+                          <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                        </svg>
+                        {token.holders.toLocaleString()}
                       </span>
                     )}
                   </div>
@@ -631,37 +865,56 @@ export default function CoinHolderView() {
           ))}
         </div>
       ) : (
-        <div className="text-center py-5">
-          <p className="text-retro-secondary mb-2">No tokens found</p>
-          <p className="text-xs text-retro-accent">
+        <div className="text-center py-8 border-2 border-retro-primary bg-gradient-to-br from-retro-primary/5 to-black/40">
+          <div className="w-16 h-16 mx-auto mb-4 bg-retro-primary/20 border-2 border-retro-primary rounded-lg flex items-center justify-center">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-retro-primary">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+          <p className="text-retro-primary mb-2 pixelated font-bold">NO TOKENS FOUND</p>
+          <p className="text-xs text-retro-secondary">
             {isConnected 
-              ? "You don't have any token holdings yet."
-              : "Connect your wallet to view your token holdings."}
+              ? searchQuery.trim() 
+                ? "Try adjusting your search terms" 
+                : "Start trading to build your token portfolio"
+              : "Connect your wallet to view your token holdings"}
           </p>
         </div>
       )}
       
-      {/* Pagination */}
+      {/* Enhanced Pagination */}
       {tokens.length > 0 && getTotalPages() > 1 && (
-        <div className="flex justify-center items-center gap-2 mt-4">
+        <div className="flex justify-center items-center gap-3 mt-6 p-3 bg-black/20 border-2 border-retro-primary">
           <RetroButton
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
-            className="text-xs py-1 px-2"
+            className="text-xs py-2 px-3 bg-transparent border-retro-primary hover:bg-retro-primary/20 transition-all"
           >
-            Prev
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 18l-6-6 6-6"/>
+            </svg>
+            PREV
           </RetroButton>
           
-          <span className="text-xs text-retro-secondary">
-            Page {currentPage} of {getTotalPages()}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-retro-secondary pixelated">PAGE</span>
+            <span className="text-sm text-retro-primary font-bold pixelated bg-retro-primary/20 px-2 py-1 border border-retro-primary">
+              {currentPage}
+            </span>
+            <span className="text-xs text-retro-secondary pixelated">OF {getTotalPages()}</span>
+          </div>
           
           <RetroButton
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === getTotalPages()}
-            className="text-xs py-1 px-2"
+            className="text-xs py-2 px-3 bg-transparent border-retro-primary hover:bg-retro-primary/20 transition-all"
           >
-            Next
+            NEXT
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 18l6-6-6-6"/>
+            </svg>
           </RetroButton>
         </div>
       )}

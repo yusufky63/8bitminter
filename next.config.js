@@ -12,14 +12,44 @@ const nextConfig = {
     return config;
   },
   images: {
-    domains: ['api.together.ai', 'ipfs.io'],
     remotePatterns: [
       {
         protocol: "https",
         hostname: "raw.githubusercontent.com",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "api.together.ai",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "ipfs.io",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "api.stability.ai",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "replicate.delivery",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "pbxt.replicate.delivery",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "tjzk.replicate.delivery",
+        pathname: "/**",
+      },
     ],
+
   },
   // Minimalize configurations to avoid conflicts
   async headers() {

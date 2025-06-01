@@ -1,11 +1,37 @@
-import { processTtlgenHerImage } from './imageUtils';
+import { processTtlgenHerImage } from "./imageUtils";
+
+// =============================================================================
+// CONSTANTS & CONFIGURATION
+// =============================================================================
 
 const MAX_RETRIES = 3;
+
+const API_ENDPOINTS = {
+  TOGETHER_TEXT: "https://api.together.xyz/v1/completions",
+  TOGETHER_IMAGE: "https://api.together.xyz/v1/images/generations",
+  STABILITY_AI: "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image",
+  REPLICATE: "https://api.replicate.com/v1/predictions",
+};
+
+const MODELS = {
+  TEXT: {
+    PRIMARY: "mistralai/Mixtral-8x7B-Instruct-v0.1",
+    FALLBACK: "meta-llama/Llama-3.1-8B-Instruct-Turbo-Free",
+    ANALYSIS: [
+      "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free",
+      "mistralai/Mixtral-8x7B-Instruct-v0.1",
+    ],
+  },
+  IMAGE: {
+    TOGETHER: "black-forest-labs/FLUX.1-schnell-Free",
+    REPLICATE: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
+  },
+};
 
 // Updated coin categories to match the retro 8-bit theme
 const COIN_CATEGORIES = [
   {
-    name: "8-Bit Gaming", 
+    name: "8-Bit Gaming",
     features: "Retro gaming, pixel characters, arcade experiences, game collectibles, nostalgia",
     themes: "Arcade, classic games, pixel art, chiptune, high scores",
   },
@@ -56,26 +82,267 @@ const COIN_CATEGORIES = [
   },
 ];
 
-// Export categories for external use
-export const getCoinCategories = () => COIN_CATEGORIES;
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
 
-// Ortam değişkeninden API key'ini alır, yoksa hata döndürür
+/**
+ * Get API key from environment variables
+ */
 const getApiKey = () => {
   const apiKey = process.env.NEXT_PUBLIC_TOGETHER_API_KEY;
   if (!apiKey) {
     console.error("Together API key is missing from environment variables");
-    throw new Error("API key is required. Please set NEXT_PUBLIC_TOGETHER_API_KEY in your environment variables.");
+    throw new Error(
+      "API key is required. Please set NEXT_PUBLIC_TOGETHER_API_KEY in your environment variables."
+    );
   }
   return apiKey;
 };
 
 /**
+ * Clean text to avoid NSFW detection
+ */
+const sanitizeText = (text) => {
+  if (!text) return "";
+  return text.replace(/beauty|sexy|hot|attractive|babe|gorgeous/gi, "lovely");
+};
+
+/**
+ * Generic retry mechanism
+ */
+const retryOperation = async (operation, context, handleError, retries = MAX_RETRIES) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await operation();
+    } catch (error) {
+      console.error(`${context} attempt ${i + 1}/${retries} failed:`, error);
+
+      if (i === retries - 1) {
+        handleError(error, context);
+        throw error;
+      }
+
+      if (error.message?.includes("user rejected")) {
+        handleError(error, context);
+        throw error;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 1000 * (i + 1)));
+    }
+  }
+};
+
+/**
+ * Wait utility
+ */
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// =============================================================================
+// IMAGE GENERATION PROVIDERS
+// =============================================================================
+
+/**
+ * Stability AI Image Generation
+ */
+const generateImageWithStabilityAI = async (name, symbol, description) => {
+  const STABILITY_API_KEY = process.env.NEXT_PUBLIC_STABILITY_API_KEY;
+  if (!STABILITY_API_KEY) {
+    throw new Error("Stability AI API key not configured");
+  }
+
+  const safeName = sanitizeText(name);
+  const safeDescription = sanitizeText(description);
+  
+  const prompt = `Pixel art style cryptocurrency token logo for "${safeName}" (${symbol}). ${
+    safeDescription ? `Theme: ${safeDescription}. ` : ""
+  }8-bit retro style, arcade-inspired, pixelated, nostalgic game art, limited color palette, chunky pixels, clean edges, resembling old video games from the 80s and 90s, circular coin design`;
+
+  const requestBody = {
+    text_prompts: [
+      { text: prompt, weight: 1 },
+      {
+        text: "realistic, photorealistic, 3D rendering, smooth gradients, high detail, soft edges, modern graphics, blur",
+        weight: -0.9,
+      },
+    ],
+    cfg_scale: 15,
+    height: 512,
+    width: 512,
+    samples: 1,
+    steps: 40,
+    style_preset: "pixel-art",
+    sampler: "K_EULER",
+  };
+
+  const response = await fetch(API_ENDPOINTS.STABILITY_AI, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${STABILITY_API_KEY}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(`Stability AI error: ${error.message || response.status}`);
+  }
+
+  const data = await response.json();
+  const base64Image = data.artifacts[0].base64;
+  const imageBlob = await fetch(`data:image/png;base64,${base64Image}`).then(
+    (r) => r.blob()
+  );
+  return URL.createObjectURL(imageBlob);
+};
+
+/**
+ * Replicate Image Generation
+ */
+const generateImageWithReplicate = async (name, symbol, description) => {
+  const REPLICATE_API_KEY = process.env.NEXT_PUBLIC_REPLICATE_API_KEY;
+  if (!REPLICATE_API_KEY) {
+    throw new Error("Replicate API key not configured");
+  }
+
+  const safeName = sanitizeText(name);
+  const safeDescription = sanitizeText(description);
+  
+  const prompt = `Professional pixel art cryptocurrency token logo, circular coin design for "${safeName}" token (${symbol}). ${
+    safeDescription ? `Theme: ${safeDescription}. ` : ""
+  }Retro 8-bit video game style, arcade-inspired geometric design, crisp pixelated artwork, nostalgic gaming graphics, limited color palette with bold contrasts, chunky square pixels, clean sharp edges, flat geometric shapes, resembling classic arcade games from the 1980s and 1990s, centered logo composition, vibrant colors, digital token emblem, coin-like appearance`;
+  
+  const negative_prompt = "nsfw, adult content, inappropriate, suggestive, sexy, erotic, nudity, revealing, provocative, seductive, text, words, letters, numbers, typography, realistic, photorealistic, 3D rendering, smooth gradients, anti-aliasing, blur, soft edges, detailed shading, complex lighting, modern graphics, high resolution details, noise, artifacts, distorted, ugly, deformed, extra elements, backgrounds, people, faces, bodies, human figures, blurry, low quality";
+
+  const response = await fetch(API_ENDPOINTS.REPLICATE, {
+    method: "POST",
+    headers: {
+      Authorization: `Token ${REPLICATE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      version: MODELS.IMAGE.REPLICATE,
+      input: {
+        prompt,
+        negative_prompt,
+        width: 1024,
+        height: 1024,
+        num_outputs: 1,
+        scheduler: "K_EULER",
+        num_inference_steps: 50,
+        guidance_scale: 7.5,
+        seed: Math.floor(Math.random() * 1000000),
+        apply_watermark: false,
+        high_noise_fraction: 0.8,
+        refiner: "expert_ensemble_refiner",
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(`Replicate API error: ${error.detail || response.status}`);
+  }
+
+  const prediction = await response.json();
+  
+  // Poll for completion
+  let result = prediction;
+  while (result.status === "starting" || result.status === "processing") {
+    await wait(1000);
+    
+    const pollResponse = await fetch(
+      `${API_ENDPOINTS.REPLICATE}/${result.id}`,
+      {
+        headers: { Authorization: `Token ${REPLICATE_API_KEY}` },
+      }
+    );
+    
+    result = await pollResponse.json();
+  }
+
+  if (result.status === "failed") {
+    throw new Error(`Replicate generation failed: ${result.error}`);
+  }
+
+  return result.output[0];
+};
+
+/**
+ * Together.ai Image Generation
+ */
+const generateImageWithTogetherAI = async (name, symbol, description, categoryContext) => {
+  const TOGETHER_API_KEY = getApiKey();
+  const category = categoryContext ? categoryContext.name : "token";
+  
+  const prompt = `Pixel art style cryptocurrency token logo for "${name}" (${symbol}). Category: ${category}. ${
+    description ? `Theme: ${description}` : ""
+  }. 8-bit retro style, arcade-inspired, pixelated, nostalgic game art, limited color palette, chunky pixels, clean edges, resembling old video games from the 80s and 90s.`;
+
+  const response = await fetch(API_ENDPOINTS.TOGETHER_IMAGE, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${TOGETHER_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: MODELS.IMAGE.TOGETHER,
+      prompt,
+      width: 512,
+      height: 512,
+      n: 1,
+      response_format: "url",
+      negative_prompt: "text, words, letters, numbers, low quality, blurry, realistic, photorealistic, 3D rendering, shading, high resolution details, smooth gradients",
+    }),
+  });
+
+  if (!response.ok) {
+    const statusCode = response.status;
+    let errorText = "";
+    
+    try {
+      const errorJson = await response.json();
+      errorText = JSON.stringify(errorJson);
+      console.error(`Together.ai API Error (${statusCode}):`, errorJson);
+    } catch (e) {
+      errorText = await response.text();
+      console.error(`Together.ai API Error (${statusCode}):`, errorText);
+    }
+    
+    if (statusCode === 401 || statusCode === 403) {
+      throw new Error("API key is invalid or expired. Please check your API key.");
+    } else if (statusCode === 429) {
+      throw new Error("Rate limit exceeded. Please try again later.");
+    } else if (statusCode >= 500) {
+      throw new Error("Together API server error. Please try again later.");
+    }
+    
+    throw new Error(errorText || `HTTP Error: ${statusCode}`);
+  }
+  
+  const data = await response.json();
+  if (!data.data || !data.data[0] || !data.data[0].url) {
+    throw new Error("Invalid API response format");
+  }
+  
+  return data.data[0].url;
+};
+
+// =============================================================================
+// MAIN API FUNCTIONS
+// =============================================================================
+
+/**
  * AI text generation function with category context
  */
 export const generateTextWithAI = async (selectedCategory = null, userDescription = "") => {
-  console.log("Starting text generation with inputs:", { selectedCategory, userDescription });
+  console.log("Starting text generation with inputs:", {
+    selectedCategory,
+    userDescription,
+  });
   
-  // Add a static flag to prevent recursive/looping calls 
   if (generateTextWithAI.isRunning) {
     console.warn("Text generation is already running - preventing recursive call");
     throw new Error("Text generation service is busy. Please try again later.");
@@ -84,23 +351,14 @@ export const generateTextWithAI = async (selectedCategory = null, userDescriptio
   generateTextWithAI.isRunning = true;
   
   try {
-    // Retry counter for API calls
     let retries = 0;
     const maxRetries = 3;
     let lastError = null;
-
-    // List of models - will switch to others if primary model fails
-    const models = [
-      "meta-llama/Llama-3.1-8B-Instruct-Turbo-Free", // Using smaller model to start
-      "mistralai/Mixtral-8x7B-Instruct-v0.1"
-    ];
-    
-    // Validate API key
+    const models = [MODELS.TEXT.PRIMARY, MODELS.TEXT.FALLBACK];
     const TOGETHER_API_KEY = getApiKey();
 
     while (retries < maxRetries) {
       try {
-        // Use selected category or pick random
         const category = selectedCategory
           ? COIN_CATEGORIES.find((cat) => cat.name === selectedCategory)
           : COIN_CATEGORIES[Math.floor(Math.random() * COIN_CATEGORIES.length)];
@@ -109,42 +367,34 @@ export const generateTextWithAI = async (selectedCategory = null, userDescriptio
           throw new Error("Category not found");
         }
 
-        // Determine model to use - change model based on error count
         const modelIndex = Math.min(retries, models.length - 1);
         const model = models[modelIndex];
         console.log(`AI Text Generation - Attempt ${retries + 1}/${maxRetries}, Model: ${model}`);
 
-        // Create a shorter prompt for more reliability
         const prompt = `Design a cryptocurrency for category "${category.name}" with description: "${userDescription}".
 Return only valid JSON with name, symbol (3-4 letters), and description (exactly 20 words, no more).
 Format: {"name":"coin name","symbol":"SYM","description":"A brief description...","category":"${category.name}"}`;
 
-        // Use direct fetch to external API instead of proxy
-        const apiUrl = "https://api.together.xyz/v1/completions";
-        
-        console.log("Sending request to external API directly");
-        
-        // Timeout kontrolü ekle
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 saniye timeout
+        const timeoutId = setTimeout(() => controller.abort(), 20000);
         
         try {
-          const response = await fetch(apiUrl, {
+          const response = await fetch(API_ENDPOINTS.TOGETHER_TEXT, {
             method: "POST",
             headers: {
-              "Authorization": `Bearer ${TOGETHER_API_KEY}`,
-              "Content-Type": "application/json"
+              Authorization: `Bearer ${TOGETHER_API_KEY}`,
+              "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              model: model,
-              prompt: prompt,
+              model,
+              prompt,
               max_tokens: 300,
               temperature: 0.7,
               top_p: 0.9,
               frequency_penalty: 0.0,
               presence_penalty: 0.0,
             }),
-            signal: controller.signal
+            signal: controller.signal,
           });
           
           clearTimeout(timeoutId);
@@ -153,10 +403,8 @@ Format: {"name":"coin name","symbol":"SYM","description":"A brief description...
             const errorData = await response.json().catch(() => ({}));
             const statusCode = response.status;
             
-            // Log API errors
             console.error(`API Error (${statusCode}):`, errorData);
             
-            // Özel hata mesajları
             if (statusCode === 401 || statusCode === 403) {
               throw new Error("API key is invalid or expired. Please check your API key.");
             } else if (statusCode === 429) {
@@ -165,20 +413,16 @@ Format: {"name":"coin name","symbol":"SYM","description":"A brief description...
               throw new Error("Together API server error. Please try again later.");
             }
             
-            throw new Error(
-              errorData.error?.message || 
-              `API Error: ${response.status} - ${response.statusText}`
-            );
+            throw new Error(errorData.error?.message || `API Error: ${response.status} - ${response.statusText}`);
           }
 
           const data = await response.json();
           console.log("API Response received");
 
-          // Empty response check - will retry in this case
           if (!data.choices || !data.choices.length || !data.choices[0].text || data.choices[0].text.trim() === "") {
             console.warn("Empty API response, retrying...");
             retries++;
-            await new Promise(r => setTimeout(r, 2000)); // Wait 2 seconds
+            await wait(2000);
             continue;
           }
 
@@ -186,42 +430,37 @@ Format: {"name":"coin name","symbol":"SYM","description":"A brief description...
           console.log("Generated text length:", generatedText.length);
 
           try {
-            // Attempt to extract JSON from the response
             const jsonMatch = generatedText.match(/\{.*\}/s);
             if (jsonMatch) {
               generatedText = jsonMatch[0];
             }
             
-            // Parse the JSON
             const result = JSON.parse(generatedText);
             
-            // Basic validation
             if (!result.name || !result.symbol || !result.description) {
               throw new Error("Missing required fields in generated content");
             }
             
-            // Limit description to exactly 20 words
             const words = result.description.split(/\s+/);
-            const limitedDescription = words.slice(0, 20).join(' ');
+            const limitedDescription = words.slice(0, 20).join(" ");
             
-            // Return successful result
             return {
               name: result.name,
               symbol: result.symbol.toUpperCase(),
               description: limitedDescription,
               category: category.name,
-              features: category.features
+              features: category.features,
             };
           } catch (parseError) {
             console.error("Error parsing AI response:", parseError);
             retries++;
-            await new Promise(r => setTimeout(r, 2000)); // Wait 2 seconds
+            await wait(2000);
             continue;
           }
         } catch (fetchError) {
           clearTimeout(timeoutId);
           
-          if (fetchError.name === 'AbortError') {
+          if (fetchError.name === "AbortError") {
             console.error("Request timed out");
             throw new Error("API request timed out after 20 seconds");
           }
@@ -232,213 +471,90 @@ Format: {"name":"coin name","symbol":"SYM","description":"A brief description...
         console.error("AI text generation error:", error);
         lastError = error;
         retries++;
-        await new Promise(r => setTimeout(r, 2000)); // Wait 2 seconds
+        await wait(2000);
       }
     }
 
-    // All retries failed - throw error instead of returning fallback data
     console.error("All AI text generation attempts failed:", lastError);
     throw new Error(`Text generation failed after ${maxRetries} attempts: ${lastError?.message || "Unknown error"}`);
   } finally {
-    // Always make sure to reset the running flag when done
     generateTextWithAI.isRunning = false;
   }
-}
+};
 
 /**
- * AI image generation with real API integration only
+ * Enhanced AI image generation with multiple fallback APIs
  */
-export const generateImageWithAI = async (
-  name,
-  symbol,
-  description,
-  categoryContext = null
-) => {
+export const generateImageWithAI = async (name, symbol, description, categoryContext = null) => {
   console.log("Starting AI image generation...");
   console.log("Inputs:", { name, symbol, description });
   
-  // Add a static flag to prevent recursive/looping calls 
-  if (generateImageWithAI.isRunning) {
-    console.warn("Image generation is already running - preventing recursive call");
-    throw new Error("Image generation service is busy. Please try again later.");
-  }
-  
-  generateImageWithAI.isRunning = true;
-  
-  try {
-    // Validate API key
-    const TOGETHER_API_KEY = getApiKey();
+  const apiProviders = [
+    {
+      name: "Stability AI",
+      generator: () => generateImageWithStabilityAI(name, symbol, description),
+    },
+    {
+      name: "Together.ai",
+      generator: () => generateImageWithTogetherAI(name, symbol, description, categoryContext),
+    },
     
-    // Extract category information or use defaults
-    const category = categoryContext ? categoryContext.name : "token";
-    
-    // Build a prompt that emphasizes pixel art style
-    const prompt = `Pixel art style cryptocurrency token logo for "${name}" (${symbol}). Category: ${category}. ${description ? `Theme: ${description}` : ""}. 8-bit retro style, arcade-inspired, pixelated, nostalgic game art, limited color palette, chunky pixels, clean edges, resembling old video games from the 80s and 90s.`;
-    
-    console.log("Image generation prompt (pixel art style):", prompt);
-    
-    // Implement retry logic for image generation
-    const maxAttempts = 2; // Reduce retries to avoid excessive API calls
-    let lastError = null;
-    
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        console.log(`Image generation attempt ${attempt}/${maxAttempts}`);
-        
-        // Timeout kontrolü ekle
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 saniye timeout (görsel için daha uzun)
-        
-        try {
-          const response = await fetch("https://api.together.xyz/v1/images/generations", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${TOGETHER_API_KEY}`,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              model: "black-forest-labs/FLUX.1-schnell-Free", // Use SDXL for better pixel art
-              prompt: prompt,
-              width: 768,
-              height: 768,
-              n: 1,
-              response_format: "url",
-              negative_prompt: "text, words, letters, numbers, low quality, blurry, realistic, photorealistic, 3D rendering, shading, high resolution details, smooth gradients",
-            }),
-            signal: controller.signal
-          });
-          
-          clearTimeout(timeoutId);
-          
-          if (!response.ok) {
-            const statusCode = response.status;
-            let errorText = "";
-            
-            try {
-              const errorJson = await response.json();
-              errorText = JSON.stringify(errorJson);
-              console.error(`Image API Error (${statusCode}):`, errorJson);
-            } catch (e) {
-              errorText = await response.text();
-              console.error(`Image API Error (${statusCode}):`, errorText);
-            }
-            
-            // Özel hata mesajları
-            if (statusCode === 401 || statusCode === 403) {
-              throw new Error("API key is invalid or expired. Please check your API key.");
-            } else if (statusCode === 429) {
-              throw new Error("Rate limit exceeded. Please try again later.");
-            } else if (statusCode >= 500) {
-              throw new Error("Together API server error. Please try again later.");
-            }
-            
-            throw new Error(errorText || `HTTP Error: ${statusCode}`);
-          }
-          
-          const data = await response.json();
-          console.log("Image API response received", data);
-          
-          // Validate the API response data
-          if (!data.data || !data.data[0] || !data.data[0].url) {
-            throw new Error("Invalid API response format");
-          }
-          
-          const imageUrl = data.data[0].url;
-          
-          // Success - check that it's a valid URL
-          if (imageUrl && (imageUrl.startsWith("http://") || imageUrl.startsWith("https://"))) {
-            return imageUrl;
-          } else {
-            throw new Error("Generated URL is invalid");
-          }
-        } catch (fetchError) {
-          clearTimeout(timeoutId);
-          
-          if (fetchError.name === 'AbortError') {
-            console.error("Image request timed out");
-            throw new Error("Image API request timed out after 30 seconds");
-          }
-          
-          throw fetchError;
-        }
-      } catch (error) {
-        lastError = error;
-        console.error(`Image generation attempt ${attempt}/${maxAttempts} failed:`, error);
-        
-        if (attempt < maxAttempts) {
-          // Wait before retry
-          console.log(`Waiting 3 seconds before retry...`);
-          await new Promise(r => setTimeout(r, 3000));
-        }
-      }
-    }
-    
-    // All attempts failed - throw an error
-    throw new Error(`Failed to generate image: ${lastError?.message || "Unknown error"}`);
-  } finally {
-    // Always ensure the running flag is reset
-    generateImageWithAI.isRunning = false;
-  }
-};
+    {
+      name: "Replicate",
+      generator: () => generateImageWithReplicate(name, symbol, description),
+    },
+  ];
 
-/**
- * Retry mechanism
- */
-export const retryOperation = async (
-  operation,
-  context,
-  handleError,
-  retries = MAX_RETRIES
-) => {
-  for (let i = 0; i < retries; i++) {
+  let lastError = null;
+  
+  for (const provider of apiProviders) {
     try {
-      return await operation();
+      console.log(`Attempting image generation with ${provider.name}...`);
+      const imageUrl = await provider.generator();
+      
+      if (imageUrl && (imageUrl.startsWith("http://") || imageUrl.startsWith("https://") || imageUrl.startsWith("blob:"))) {
+        console.log(`✅ Image generated successfully with ${provider.name}`);
+        return imageUrl;
+      } else {
+        throw new Error("Generated URL is invalid");
+      }
     } catch (error) {
-      console.error(
-        `${context} attempt ${i + 1}/${retries} failed:`,
-        error
-      );
-
-      if (i === retries - 1) {
-        // Last attempt
-        handleError(error, context);
-        throw error;
+      lastError = error;
+      console.error(`❌ ${provider.name} failed:`, error.message);
+      
+      if (error.message.includes("not configured")) {
+        console.log(`⏭️ Skipping ${provider.name} - API key not configured`);
+        continue;
       }
-
-      // If user rejected, don't retry
-      if (error.message?.includes("user rejected")) {
-        handleError(error, context);
-        throw error;
+      
+      if (provider.name === "Together.ai" && error.message.includes("Rate limit")) {
+        console.log(`⏭️ Together.ai rate limited, trying next provider...`);
+        continue;
       }
-
-      await new Promise((resolve) => setTimeout(resolve, 1000 * (i + 1))); // Increasing wait time
+      
+      await wait(1000);
     }
   }
+  
+  throw new Error(`Failed to generate image with all providers. Last error: ${lastError?.message || "Unknown error"}`);
 };
 
 /**
- * AI token analysis function - analyzes a token and answers user questions
+ * AI token analysis function
  */
 export const analyzeTokenWithAI = async (tokenData, userQuestion, onchainData = null) => {
-  // Retry counter for API calls
   let retries = 0;
   const maxRetries = 3;
   let lastError = null;
-
-  // List of models - will switch to others if primary model fails
-  const models = [
-    "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free",
-    "mistralai/Mixtral-8x7B-Instruct-v0.1"
-  ];
+  const models = MODELS.TEXT.ANALYSIS;
 
   while (retries < maxRetries) {
     try {
-      // Determine model to use - change model based on error count
       const modelIndex = Math.min(retries, models.length - 1);
       const model = models[modelIndex];
       console.log(`AI Token Analysis - Attempt ${retries + 1}/${maxRetries}, Model: ${model}`);
 
-      // Extract dates and format them properly
+      // Helper functions for data formatting
       const formatDate = (dateString) => {
         if (!dateString) return "Unknown";
         try {
@@ -448,14 +564,12 @@ export const analyzeTokenWithAI = async (tokenData, userQuestion, onchainData = 
         }
       };
       
-      // Format numbers with commas
       const formatNumber = (num) => {
         if (num === undefined || num === null) return "Unknown";
-        if (typeof num === 'string') num = parseFloat(num);
+        if (typeof num === "string") num = parseFloat(num);
         return num.toLocaleString();
       };
       
-      // Calculate price from market cap and total supply if possible
       const calculatePrice = () => {
         if (tokenData.marketCap && tokenData.totalSupply) {
           try {
@@ -468,7 +582,6 @@ export const analyzeTokenWithAI = async (tokenData, userQuestion, onchainData = 
         return "Unknown";
       };
       
-      // Calculate engagement metrics
       const calculateEngagement = () => {
         if (tokenData.transfers?.count && tokenData.uniqueHolders) {
           try {
@@ -481,7 +594,6 @@ export const analyzeTokenWithAI = async (tokenData, userQuestion, onchainData = 
         return "Unknown";
       };
       
-      // Calculate 24h change percentage
       const calculate24hChange = () => {
         if (tokenData.marketCapDelta24h && tokenData.marketCap) {
           try {
@@ -498,13 +610,15 @@ export const analyzeTokenWithAI = async (tokenData, userQuestion, onchainData = 
         return "Unknown";
       };
 
-      // Prepare token data for AI context with all available metrics
+      // Prepare token summary
       const tokenSummary = {
         name: tokenData.name || "Unknown",
         symbol: tokenData.symbol || "???",
-        description: tokenData.description ? (tokenData.description.length > 200 ? 
-                    tokenData.description.substring(0, 200) + "..." : 
-                    tokenData.description) : "No description",
+        description: tokenData.description
+          ? tokenData.description.length > 200
+            ? tokenData.description.substring(0, 200) + "..."
+            : tokenData.description
+          : "No description",
         price: calculatePrice(),
         marketCap: formatNumber(tokenData.marketCap) || "Unknown",
         marketCap24hChange: calculate24hChange(),
@@ -516,38 +630,41 @@ export const analyzeTokenWithAI = async (tokenData, userQuestion, onchainData = 
         txPerHolder: calculateEngagement(),
         comments: formatNumber(tokenData.zoraComments?.count) || "Unknown",
         created: formatDate(tokenData.createdAt),
-        age: tokenData.createdAt ? 
-              Math.floor((new Date() - new Date(tokenData.createdAt)) / (1000 * 60 * 60 * 24)) + " days" : 
-              "Unknown",
+        age: tokenData.createdAt
+          ? Math.floor((new Date() - new Date(tokenData.createdAt)) / (1000 * 60 * 60 * 24)) + " days"
+          : "Unknown",
       };
 
-      // Onchain data section - only include if available
+      // Onchain data formatting
       let onchainSummary = "";
       if (onchainData && Object.keys(onchainData).length > 0) {
         const formatValue = (value) => {
           if (!value) return "Unknown";
           if (value.formatted) return value.formatted;
-          if (typeof value === 'bigint') return value.toString();
+          if (typeof value === "bigint") return value.toString();
           return String(value);
         };
         
         onchainSummary = `
 Onchain Data:
-- Liquidity: ${formatValue(onchainData.liquidity)} (USD: ${formatValue(onchainData.liquidity?.usdcDecimal || onchainData.liquidityUSD || 0)})
+- Liquidity: ${formatValue(onchainData.liquidity)} (USD: ${formatValue(
+          onchainData.liquidity?.usdcDecimal || onchainData.liquidityUSD || 0
+        )})
 - Total Supply: ${formatValue(onchainData.totalSupply)}
 - Unique Holders: ${onchainData.owners?.length || 0}
 - Pool Address: ${onchainData.pool || "Unknown"}
 `;
       }
 
-      // Check if the question is about investment potential
-      const isInvestmentQuestion = userQuestion.toLowerCase().includes("invest") || 
-                                  userQuestion.toLowerCase().includes("good investment") || 
-                                  userQuestion.toLowerCase().includes("worth") ||
-                                  userQuestion.toLowerCase().includes("potential") ||
-                                  userQuestion.toLowerCase().includes("buy");
+      // Check if investment question
+      const isInvestmentQuestion =
+        userQuestion.toLowerCase().includes("invest") ||
+        userQuestion.toLowerCase().includes("good investment") ||
+        userQuestion.toLowerCase().includes("worth") ||
+        userQuestion.toLowerCase().includes("potential") ||
+        userQuestion.toLowerCase().includes("buy");
       
-      // Create structured prompt with all available metrics
+      // Create analysis prompt
       let prompt = `Analyze this cryptocurrency token based on these metrics: 
 Token: ${tokenSummary.name} (${tokenSummary.symbol})
 Description: ${tokenData.description || "No description"}
@@ -579,7 +696,6 @@ STRENGTHS AND WEAKNESSES:
 - List the main strengths of this token (2-3 points)
 - List the main weaknesses or risks (2-3 points)`;
 
-      // Add special instructions for investment questions
       if (isInvestmentQuestion) {
         prompt += `\n\nINVESTMENT ANSWER: Start with ONE of these exact options: "Yes", "No", "Maybe", "It depends", "Unlikely", or "Insufficient data". Then provide 2-3 sentences explaining your evaluation based on the metrics above.
 
@@ -592,16 +708,13 @@ IMPORTANT: Your entire response must be under 250 words. Focus on the data while
 
       console.log("Sending prompt with length:", prompt.length);
 
-      // Use the unified API endpoint for text generation
       const response = await fetch("/api/together", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: model,
-          prompt: prompt,
-          max_tokens: 400, // Increased for more detailed answers
+          model,
+          prompt,
+          max_tokens: 400,
           temperature: 0.7,
           top_p: 0.95,
           frequency_penalty: 0.5,
@@ -611,27 +724,22 @@ IMPORTANT: Your entire response must be under 250 words. Focus on the data while
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.error?.message || 
-          `API Error: ${response.status} - ${response.statusText}`
-        );
+        throw new Error(errorData.error?.message || `API Error: ${response.status} - ${response.statusText}`);
       }
 
       const data = await response.json();
       console.log("API Response:", data);
 
-      // Empty response check - will retry in this case
       if (!data.choices || !data.choices.length || !data.choices[0].text || data.choices[0].text.trim() === "") {
         console.warn("Empty API response, retrying...");
         retries++;
-        await new Promise(r => setTimeout(r, 2000)); // Wait 2 seconds
+        await wait(2000);
         continue;
       }
 
       const generatedText = data.choices[0].text.trim();
       console.log("Generated Analysis:", generatedText);
 
-      // Return the analysis with metadata
       return {
         analysis: generatedText,
         model: data.model,
@@ -644,17 +752,22 @@ IMPORTANT: Your entire response must be under 250 words. Focus on the data while
       lastError = error;
       retries++;
       
-      // Retry if not last attempt
       if (retries < maxRetries) {
-        await new Promise(r => setTimeout(r, 2000 * retries));
+        await wait(2000 * retries);
         continue;
       }
       
-      // If all attempts fail
       throw new Error(`AI token analysis error: ${error.message}`);
     }
   }
   
-  // If we reach here, all attempts failed
   throw lastError || new Error("Unknown error in AI token analysis");
 };
+
+// =============================================================================
+// EXPORTS
+// =============================================================================
+
+export const getCoinCategories = () => COIN_CATEGORIES;
+
+export { retryOperation };

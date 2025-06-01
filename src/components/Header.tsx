@@ -1,15 +1,17 @@
 import React, { useState } from "react";
-import Image from "next/image";
-
 interface HeaderProps {
   activeTab?: string;
   onTabChange?: (tab: string) => void;
   userName?: string;
 }
 
-export default function RetroHeader({ activeTab = "create", onTabChange, userName }: HeaderProps) {
+export default function RetroHeader({
+  activeTab = "create",
+  onTabChange,
+  userName,
+}: HeaderProps) {
   const [currentTab, setCurrentTab] = useState(activeTab);
-  
+
   const handleTabChange = (tab: string) => {
     setCurrentTab(tab);
     if (onTabChange) {
@@ -23,9 +25,13 @@ export default function RetroHeader({ activeTab = "create", onTabChange, userNam
         <div className="retro-grid-background">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <img src="/logo.png" alt="Logo" className="w-10 h-10 mr-3 pixelated" />
+              <img
+                src="/logo.png"
+                alt="Logo"
+                className="w-10 h-10 mr-3 pixelated"
+              />
               <h1 className="text-xl font-bold tracking-tight text-retro-accent font-mono">
-                8BitMinter
+                8BitCoiner
               </h1>
             </div>
             {userName && (
@@ -36,27 +42,40 @@ export default function RetroHeader({ activeTab = "create", onTabChange, userNam
           </div>
         </div>
       </div>
-      
+
       <div className="text-center font-mono text-[10px] text-retro-secondary mb-1">
-        CREATE PIXEL-PERFECT TOKENS ON FARCASTER <span className="retro-blink">▌</span>
+        CREATE PIXEL-PERFECT TOKENS ON FARCASTER{" "}
+        <span className="retro-blink">▌</span>
       </div>
-      
+
       <div className="retro-container p-0.5 mb-0">
         <div className="grid grid-cols-3 gap-0.5">
-          <button 
-            className={`retro-button py-0.5 text-xs ${currentTab === "create" ? "bg-retro-primary" : "bg-retro-primary/5 border border-retro-primary text-retro-primary"}`}
+          <button
+            className={`retro-button py-0.5 text-xs ${
+              currentTab === "create"
+                ? "bg-retro-primary"
+                : "bg-retro-primary/5 border border-retro-primary text-retro-primary"
+            }`}
             onClick={() => handleTabChange("create")}
           >
             CREATE
           </button>
-          <button 
-            className={`retro-button py-0.5 text-xs ${currentTab === "hold" ? "bg-retro-primary" : "bg-retro-primary/5 border border-retro-primary text-retro-primary"}`}
+          <button
+            className={`retro-button py-0.5 text-xs ${
+              currentTab === "hold"
+                ? "bg-retro-primary"
+                : "bg-retro-primary/5 border border-retro-primary text-retro-primary"
+            }`}
             onClick={() => handleTabChange("hold")}
           >
             HOLD
           </button>
-          <button 
-            className={`retro-button py-0.5 text-xs ${currentTab === "explore" ? "bg-retro-primary" : "bg-retro-primary/5 border border-retro-primary text-retro-primary"}`}
+          <button
+            className={`retro-button py-0.5 text-xs ${
+              currentTab === "explore"
+                ? "bg-retro-primary"
+                : "bg-retro-primary/5 border border-retro-primary text-retro-primary"
+            }`}
             onClick={() => handleTabChange("explore")}
           >
             EXPLORE
@@ -65,4 +84,4 @@ export default function RetroHeader({ activeTab = "create", onTabChange, userNam
       </div>
     </div>
   );
-} 
+}

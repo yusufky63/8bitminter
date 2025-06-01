@@ -12,7 +12,7 @@ export async function GET() {
     },
     frame: {
       version: "1",
-      name: "8BitMinter",
+      name: "8BitCoiner",
       description: "Create and mint your own 8-bit style tokens on the blockchain.",
       iconUrl: `${appUrl}/logo.png`,
       homeUrl: appUrl,

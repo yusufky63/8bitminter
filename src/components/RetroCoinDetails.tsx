@@ -2,13 +2,20 @@ import React, { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { toast } from "react-hot-toast";
-import { getCoinDetails } from "../services/sdk/getCoins.js";
+import { getCoinDetails, fetchCoinComments } from "../services/sdk/getCoins.js";
 import {
   validateTradeBalance,
   checkETHBalance,
   checkTokenBalance,
   getTradeContractCallParams,
 } from "../services/sdk/getTradeCoin.js";
+import {
+  getOnchainTokenDetails,
+  getLiquidityInfo,
+  getMarketCapInfo,
+  getTokenPrice,
+} from "../services/sdk/getOnchainData.js";
+import { analyzeTokenWithAI } from "../services/aiService";
 import { parseEther } from "viem";
 import { RetroButton } from "./ui/RetroButton";
 
@@ -33,6 +40,20 @@ interface TokenDetails {
   totalVolume?: string;
   uniqueHolders?: number;
   createdAt?: string;
+  marketCapDelta24h?: string;
+  transfers?: {
+    count: number;
+  };
+}
+
+// Token Score Interface
+interface TokenScore {
+  overall: number;
+  liquidity: number;
+  volume: number;
+  community: number;
+  risk: number;
+  growth: number;
 }
 
 // Explicitly type the data from getCoinDetails API
@@ -61,6 +82,13 @@ interface CoinData {
   totalVolume?: string;
   uniqueHolders?: number;
   createdAt?: string;
+  marketCapDelta24h?: string;
+  transfers?: {
+    count: number;
+  };
+  zoraComments?: {
+    count: number;
+  };
 }
 
 // Define the validation result interface to handle type checking
@@ -86,6 +114,31 @@ interface TradeContractParams {
   value?: bigint;
 }
 
+// Comment interface matching the actual API structure
+interface Comment {
+  node: {
+    txHash: string;
+    comment: string;
+    userAddress: string;
+    timestamp: number;
+    userProfile: {
+      id: string;
+      handle: string;
+      avatar?: {
+        previewImage?: {
+          blurhash: string;
+          small: string;
+          medium: string;
+        };
+      };
+    };
+    replies?: {
+      count: number;
+      edges: any[];
+    };
+  };
+}
+
 export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
@@ -108,7 +161,189 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
     "idle" | "pending" | "success" | "error"
   >("idle");
 
-  // Add a variable to track if the amount is valid
+  // Analysis states
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<string | null>(null);
+  const [showAnalysis, setShowAnalysis] = useState(false);
+  const [analysisQuestion, setAnalysisQuestion] = useState(
+    "What is this token about and what are its key metrics?"
+  );
+
+  // Onchain data states
+  const [onchainData, setOnchainData] = useState<any>(null);
+  const [isLoadingOnchain, setIsLoadingOnchain] = useState(false);
+
+  // Comments states
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
+  const [commentsPageInfo, setCommentsPageInfo] = useState<any>(null);
+  const [totalCommentsCount, setTotalCommentsCount] = useState(0);
+
+  // Token Score state
+  const [tokenScore, setTokenScore] = useState<TokenScore | null>(null);
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<"details" | "trade" | "analysis">(
+    "details"
+  );
+
+  // Calculate Token Score
+  const calculateTokenScore = useCallback(
+    (
+      tokenData: TokenDetails,
+      onchainData: any,
+      commentsCount: number
+    ): TokenScore => {
+      // Liquidity Score (0-100)
+      const marketCapNum = parseFloat(tokenData.marketCap || "0");
+      const liquidityScore = Math.min(
+        100,
+        Math.max(
+          0,
+          marketCapNum > 100000
+            ? 90
+            : marketCapNum > 50000
+            ? 80
+            : marketCapNum > 10000
+            ? 60
+            : marketCapNum > 1000
+            ? 40
+            : 20
+        )
+      );
+
+      // Volume Score (0-100)
+      const volume24h = parseFloat(tokenData.volume24h || "0");
+      const totalVolume = parseFloat(tokenData.totalVolume || "0");
+      const volumeScore = Math.min(
+        100,
+        Math.max(
+          0,
+          volume24h > 10000
+            ? 95
+            : volume24h > 1000
+            ? 80
+            : volume24h > 100
+            ? 60
+            : volume24h > 10
+            ? 40
+            : totalVolume > 50000
+            ? 30
+            : 10
+        )
+      );
+
+      // Community Score (0-100)
+      const holders = tokenData.uniqueHolders || 0;
+      const transfers = tokenData.transfers?.count || 0;
+      const communityScore = Math.min(
+        100,
+        Math.max(
+          0,
+          (holders > 1000
+            ? 40
+            : holders > 500
+            ? 30
+            : holders > 100
+            ? 20
+            : holders > 10
+            ? 10
+            : 5) +
+            (commentsCount > 50
+              ? 25
+              : commentsCount > 20
+              ? 20
+              : commentsCount > 5
+              ? 15
+              : commentsCount > 0
+              ? 10
+              : 0) +
+            (transfers > 10000
+              ? 35
+              : transfers > 1000
+              ? 25
+              : transfers > 100
+              ? 15
+              : transfers > 10
+              ? 10
+              : 5)
+        )
+      );
+
+      // Risk Score (0-100, lower is better, inverted for display)
+      const age = tokenData.createdAt
+        ? (Date.now() - new Date(tokenData.createdAt).getTime()) /
+          (1000 * 60 * 60 * 24)
+        : 0;
+      const riskFactors = [
+        age < 1 ? 30 : age < 7 ? 20 : age < 30 ? 10 : 0, // Age risk
+        holders < 10 ? 25 : holders < 50 ? 15 : holders < 100 ? 10 : 0, // Holder concentration risk
+        marketCapNum < 1000 ? 20 : marketCapNum < 10000 ? 10 : 0, // Market cap risk
+        volume24h < 1 ? 25 : volume24h < 10 ? 15 : 0, // Liquidity risk
+      ];
+      const totalRisk = riskFactors.reduce((sum, risk) => sum + risk, 0);
+      const riskScore = Math.max(0, 100 - totalRisk); // Invert so higher is better
+
+      // Growth Score (0-100)
+      const marketCapDelta = parseFloat(tokenData.marketCapDelta24h || "0");
+      const growthScore = Math.min(
+        100,
+        Math.max(
+          0,
+          marketCapDelta > 50
+            ? 95
+            : marketCapDelta > 20
+            ? 80
+            : marketCapDelta > 10
+            ? 70
+            : marketCapDelta > 0
+            ? 60
+            : marketCapDelta > -10
+            ? 40
+            : marketCapDelta > -20
+            ? 25
+            : 10
+        )
+      );
+
+      // Overall Score (weighted average)
+      const overallScore = Math.round(
+        liquidityScore * 0.25 +
+          volumeScore * 0.2 +
+          communityScore * 0.2 +
+          riskScore * 0.2 +
+          growthScore * 0.15
+      );
+
+      return {
+        overall: overallScore,
+        liquidity: Math.round(liquidityScore),
+        volume: Math.round(volumeScore),
+        community: Math.round(communityScore),
+        risk: Math.round(riskScore),
+        growth: Math.round(growthScore),
+      };
+    },
+    []
+  );
+
+  // Get score color
+  const getScoreColor = (score: number): string => {
+    if (score >= 80) return "text-green-400";
+    if (score >= 60) return "text-yellow-400";
+    if (score >= 40) return "text-orange-400";
+    return "text-red-400";
+  };
+
+  // Get score label
+  const getScoreLabel = (score: number): string => {
+    if (score >= 90) return "EXCELLENT";
+    if (score >= 80) return "VERY GOOD";
+    if (score >= 70) return "GOOD";
+    if (score >= 60) return "FAIR";
+    if (score >= 40) return "POOR";
+    return "VERY POOR";
+  };
 
   // Fetch ETH price in USD
   const fetchEthPrice = useCallback(async () => {
@@ -150,6 +385,79 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
     }
   }, [isConnected, address, publicClient, tokenDetails]);
 
+  // Fetch onchain data
+  const fetchOnchainData = useCallback(
+    async (tokenAddress: string) => {
+      if (!tokenAddress) return;
+
+      setIsLoadingOnchain(true);
+      try {
+        console.log("Fetching onchain data for:", tokenAddress);
+        const data = await getOnchainTokenDetails(
+          tokenAddress,
+          address || undefined
+        );
+        setOnchainData(data);
+        console.log("Onchain data loaded:", data);
+      } catch (error) {
+        console.error("Error fetching onchain data:", error);
+      } finally {
+        setIsLoadingOnchain(false);
+      }
+    },
+    [address]
+  );
+
+  // Fetch comments with corrected structure
+  const fetchCommentsData = useCallback(
+    async (tokenAddress: string, after: string | null = null) => {
+      if (!tokenAddress) return;
+
+      setIsLoadingComments(true);
+      try {
+        console.log("Fetching comments for:", tokenAddress, "after:", after);
+        const data = (await fetchCoinComments(
+          tokenAddress,
+          10,
+          after || undefined
+        )) as {
+          comments: Comment[];
+          pageInfo: any;
+          totalCount: number;
+        };
+
+        if (after) {
+          // Append to existing comments for pagination
+          setComments((prev) => [...prev, ...(data.comments || [])]);
+        } else {
+          // First load
+          setComments(data.comments || []);
+        }
+
+        setCommentsPageInfo(data.pageInfo || null);
+        setTotalCommentsCount(data.totalCount || 0);
+        console.log("Comments loaded:", data);
+      } catch (error) {
+        console.error("Error fetching comments:", error);
+        toast.error("Failed to load comments");
+      } finally {
+        setIsLoadingComments(false);
+      }
+    },
+    []
+  );
+
+  // Load more comments
+  const loadMoreComments = useCallback(() => {
+    if (
+      commentsPageInfo?.hasNextPage &&
+      commentsPageInfo?.endCursor &&
+      tokenDetails?.address
+    ) {
+      fetchCommentsData(tokenDetails.address, commentsPageInfo.endCursor);
+    }
+  }, [commentsPageInfo, tokenDetails?.address, fetchCommentsData]);
+
   // Calculate purchase amount based on percentage of balance
   const calculatePurchaseAmount = useCallback(
     (percentage: number): string => {
@@ -157,7 +465,7 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
         if (userEthBalance === BigInt(0)) return "0.001";
 
         // Calculate percentage of ETH balance (leave some for gas)
-        const maxUsableBalance = (userEthBalance * BigInt(95)) / BigInt(100); // Use max 95% of balance to leave gas
+        const maxUsableBalance = (userEthBalance * BigInt(98)) / BigInt(100); // Use max 95% of balance to leave gas
         const amount = (maxUsableBalance * BigInt(percentage)) / BigInt(100);
 
         // Convert to ETH (with 5 decimal places)
@@ -280,71 +588,23 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
     }
   };
 
-  // Fetch token details
-  useEffect(() => {
-    const fetchTokenDetails = async () => {
-      if (!coinAddress) {
-        setIsLoading(false);
-        return;
-      }
+  // Handle trade type change with improved functionality
+  const handleTradeTypeChange = (type: "buy" | "sell") => {
+    // Only perform actions if the type is actually changing
+    if (type !== tradeType) {
+      setTradeType(type);
+      setIsCustomAmount(false);
 
-      setIsLoading(true);
-      try {
-        const data = (await getCoinDetails(coinAddress)) as CoinData;
-
-        if (data) {
-          setTokenDetails({
-            address: data.address,
-            name: data.name,
-            symbol: data.symbol,
-            totalSupply: data.totalSupply || "0",
-            description: data.description,
-            creator: {
-              address:
-                data.creatorAddress || data.creator?.address || "Unknown",
-              profileName:
-                data.creator?.profileName || data.creatorProfile?.handle,
-            },
-            imageUri: data.mediaContent?.previewImage?.medium || data.tokenUri,
-            marketCap: data.marketCap,
-            volume24h: data.volume24h,
-            totalVolume: data.totalVolume,
-            uniqueHolders: data.uniqueHolders,
-            createdAt: data.createdAt,
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching token details:", error);
-        toast.error("Failed to load token details");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (coinAddress) {
-      fetchTokenDetails();
-    } else {
-      setIsLoading(false);
-    }
-  }, [coinAddress, isConnected]);
-
-  // Update balances and fetch ETH price
-  useEffect(() => {
-    if (tokenDetails) {
-      fetchEthPrice();
-      updateUserBalances();
-    }
-  }, [tokenDetails, updateUserBalances, fetchEthPrice]);
-
-  // Update purchase amount when slider changes or trade type changes
-  useEffect(() => {
-    if (!isCustomAmount) {
-      if (tradeType === "buy") {
-        // For buy, use calculatePurchaseAmount
+      // Update amounts based on new trade type
+      if (type === "buy") {
+        // For buy trades, calculate based on ETH balance
         const newAmount = calculatePurchaseAmount(selectedPurchasePercentage);
         setTradeAmount(newAmount);
+        console.log(
+          `Switched to BUY: ${selectedPurchasePercentage}% of ETH balance = ${newAmount} ETH`
+        );
       } else {
-        // For sell, calculate directly from token balance
+        // For sell trades, calculate based on token balance
         const tokenBalanceNumber = Number(userTokenBalance) / 10 ** 18;
         const tokenAmountToSell =
           tokenBalanceNumber * (selectedPurchasePercentage / 100);
@@ -362,60 +622,10 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
         }
 
         setTradeAmount(formattedAmount);
+        console.log(
+          `Switched to SELL: ${selectedPurchasePercentage}% of token balance = ${formattedAmount} ${tokenDetails?.symbol}`
+        );
       }
-    }
-  }, [
-    selectedPurchasePercentage,
-    calculatePurchaseAmount,
-    isCustomAmount,
-    tradeType,
-    userTokenBalance,
-  ]);
-
-  // Handle trade type change with improved functionality
-  const handleTradeTypeChange = (type: "buy" | "sell") => {
-    // Only perform actions if the type is actually changing
-    if (type !== tradeType) {
-      setTradeType(type);
-      setIsCustomAmount(false);
-
-      // Reset to a more appropriate percentage depending on trade type
-      if (type === "buy") {
-        // For buy, use 10% of ETH balance
-        setSelectedPurchasePercentage(10);
-
-        // Calculate the new amount based on 10% of ETH balance
-        const newAmount = calculatePurchaseAmount(10);
-        setTradeAmount(newAmount);
-      } else {
-        // For sell mode, use the full token balance by default
-        // Format the token balance for display
-        const tokenBalanceNumber = Number(userTokenBalance) / 10 ** 18;
-
-        // Use full token balance (99%) for sell by default
-        setSelectedPurchasePercentage(99);
-
-        // Format the token balance appropriately
-        let formattedBalance = tokenBalanceNumber.toString();
-        if (tokenBalanceNumber < 0.00001) {
-          formattedBalance = tokenBalanceNumber.toExponential(5);
-        } else if (tokenBalanceNumber < 0.001) {
-          formattedBalance = tokenBalanceNumber.toFixed(6);
-        } else if (tokenBalanceNumber < 1) {
-          formattedBalance = tokenBalanceNumber.toFixed(5);
-        } else {
-          formattedBalance = tokenBalanceNumber.toFixed(2);
-        }
-
-        // Set the full token balance in the input field
-        setTradeAmount(formattedBalance);
-      }
-
-      console.log(
-        `Switched to ${type} mode with amount: ${
-          tradeType === "buy" ? tradeAmount : "full token balance"
-        }`
-      );
     }
   };
 
@@ -766,40 +976,37 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
   const estimateEthReturn = (tokenAmountStr: string): string => {
     try {
       const amount = parseFloat(tokenAmountStr);
-      if (isNaN(amount) || amount <= 0 || !tokenDetails) return "0";
+      if (!amount || amount <= 0 || !tokenDetails) return "0";
 
       let estimatedEthReturn = 0;
 
-      if (
-        tokenDetails.marketCap &&
-        tokenDetails.totalSupply &&
-        tokenDetails.volume24h
-      ) {
-        // Use volume, market cap, and supply for more accurate estimation
-        const marketCap = parseFloat(tokenDetails.marketCap);
-        const totalSupply = parseFloat(tokenDetails.totalSupply);
+      // Use volume data for better price calculation if available
+      if (tokenDetails.volume24h && tokenDetails.uniqueHolders) {
         const volume24h = parseFloat(tokenDetails.volume24h);
+        const holders = tokenDetails.uniqueHolders;
 
-        if (!isNaN(marketCap) && !isNaN(totalSupply) && totalSupply > 0) {
-          // Calculate token price in ETH with adjustments for volume
-          const tokenPriceInUsd = marketCap / totalSupply;
-          const tokenPriceInEth = tokenPriceInUsd / ethToUsdRate;
+        if (!isNaN(volume24h) && volume24h > 0 && holders > 0) {
+          // Estimate daily price impact based on volume and holders
+          const avgTradeSize = volume24h / (holders * 2); // Rough estimate
+          const percentOfDailyVolume = (amount * ethToUsdRate) / volume24h;
 
-          // Apply slippage based on amount relative to volume and total supply
-          const percentOfSupply = (amount / totalSupply) * 100;
-          const volumeRatio = volume24h / marketCap;
+          // Calculate token price from market cap
+          const marketCap = parseFloat(tokenDetails.marketCap || "0");
+          const totalSupply = parseFloat(tokenDetails.totalSupply || "0");
 
-          // High volume/market cap ratio means more liquidity & less slippage
-          const liquidityFactor = Math.min(volumeRatio * 50, 1); // Scale from 0-1
+          if (marketCap > 0 && totalSupply > 0) {
+            const tokenPriceInUsd = marketCap / totalSupply;
+            const tokenPriceInEth = tokenPriceInUsd / ethToUsdRate;
 
-          // Calculate slippage - higher for larger sells relative to supply
-          // Adjusted based on volume/mc ratio (more volume = less slippage)
-          const baseSlippage = Math.min(percentOfSupply * 2, 0.2); // Max 20% slippage
-          const adjustedSlippage = baseSlippage * (1 - liquidityFactor);
+            // Apply slippage based on trade size vs daily volume
+            const baseSlippage = 0.01; // 1% base slippage
+            const volumeSlippage = Math.min(percentOfDailyVolume * 2, 0.15); // Max 15% slippage
+            const adjustedSlippage = baseSlippage + volumeSlippage;
 
-          // Apply the slippage to the token price
-          estimatedEthReturn =
-            amount * tokenPriceInEth * (1 - adjustedSlippage);
+            // Apply the slippage to the token price
+            estimatedEthReturn =
+              amount * tokenPriceInEth * (1 - adjustedSlippage);
+          }
         }
       } else if (tokenDetails.marketCap && tokenDetails.totalSupply) {
         // Fallback to just market cap and supply if no volume data
@@ -836,6 +1043,217 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
       return "0";
     }
   };
+
+  // Token Analysis Function
+  const handleAnalyzeToken = async () => {
+    if (!tokenDetails) {
+      toast.error("No token data available for analysis");
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setAnalysisResult(null);
+
+    try {
+      // Prepare token data for analysis including onchain data
+      const tokenDataForAnalysis = {
+        name: tokenDetails.name,
+        symbol: tokenDetails.symbol,
+        description: tokenDetails.description || "",
+        marketCap: tokenDetails.marketCap,
+        volume24h: tokenDetails.volume24h,
+        totalVolume: tokenDetails.totalVolume,
+        uniqueHolders: tokenDetails.uniqueHolders,
+        totalSupply: tokenDetails.totalSupply,
+        createdAt: tokenDetails.createdAt,
+        address: tokenDetails.address,
+        // Add onchain data if available
+        transfers: { count: comments.length }, // Use comments as proxy for activity
+        zoraComments: { count: totalCommentsCount },
+      };
+
+      console.log("Analyzing token with onchain data:", tokenDataForAnalysis);
+
+      const result = await analyzeTokenWithAI(
+        tokenDataForAnalysis,
+        analysisQuestion,
+        onchainData // Pass onchain data as third parameter
+      );
+
+      setAnalysisResult(result.analysis);
+      setShowAnalysis(true);
+      toast.success("Analysis completed!");
+    } catch (error) {
+      console.error("Analysis failed:", error);
+      toast.error(
+        `Analysis failed: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  // Format analysis text for better display
+  const formatAnalysisText = (text: string) => {
+    return text
+      .split("\n")
+      .map((line, index) => {
+        // Handle section headers
+        if (
+          line.includes("OVERVIEW:") ||
+          line.includes("METRICS ANALYSIS:") ||
+          line.includes("STRENGTHS AND WEAKNESSES:") ||
+          line.includes("INVESTMENT ANSWER:") ||
+          line.includes("ANSWER:")
+        ) {
+          return (
+            <div
+              key={index}
+              className="font-bold text-retro-primary text-xs mb-2 mt-3 pixelated"
+            >
+              {line}
+            </div>
+          );
+        }
+        // Handle bullet points
+        if (line.trim().startsWith("-")) {
+          return (
+            <div key={index} className="text-retro-accent text-xs ml-4 mb-1">
+              • {line.trim().substring(1)}
+            </div>
+          );
+        }
+        // Handle regular text
+        if (line.trim()) {
+          return (
+            <div key={index} className="text-retro-accent text-xs mb-2">
+              {line}
+            </div>
+          );
+        }
+        return null;
+      })
+      .filter(Boolean);
+  };
+
+  // Fetch token details
+  useEffect(() => {
+    const fetchTokenDetails = async () => {
+      if (!coinAddress) {
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const data = (await getCoinDetails(coinAddress)) as CoinData;
+
+        if (data) {
+          setTokenDetails({
+            address: data.address,
+            name: data.name,
+            symbol: data.symbol,
+            totalSupply: data.totalSupply || "0",
+            description: data.description,
+            creator: {
+              address:
+                data.creatorAddress || data.creator?.address || "Unknown",
+              profileName:
+                data.creator?.profileName || data.creatorProfile?.handle,
+            },
+            imageUri: data.mediaContent?.previewImage?.medium || data.tokenUri,
+            marketCap: data.marketCap,
+            volume24h: data.volume24h,
+            totalVolume: data.totalVolume,
+            uniqueHolders: data.uniqueHolders,
+            createdAt: data.createdAt,
+            marketCapDelta24h: data.marketCapDelta24h,
+            transfers: data.transfers,
+          });
+
+          // Fetch onchain data and comments when token details are loaded
+          fetchOnchainData(data.address);
+          fetchCommentsData(data.address);
+        }
+      } catch (error) {
+        console.error("Error fetching token details:", error);
+        toast.error("Failed to load token details");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (coinAddress) {
+      fetchTokenDetails();
+    } else {
+      setIsLoading(false);
+    }
+  }, [coinAddress, isConnected, fetchOnchainData, fetchCommentsData]);
+
+  // Update balances and fetch ETH price
+  useEffect(() => {
+    if (tokenDetails) {
+      fetchEthPrice();
+      updateUserBalances();
+    }
+  }, [tokenDetails, updateUserBalances, fetchEthPrice]);
+
+  // Calculate token score when data is available
+  useEffect(() => {
+    if (tokenDetails && !isLoadingComments && !isLoadingOnchain) {
+      const score = calculateTokenScore(
+        tokenDetails,
+        onchainData,
+        totalCommentsCount
+      );
+      setTokenScore(score);
+    }
+  }, [
+    tokenDetails,
+    onchainData,
+    totalCommentsCount,
+    isLoadingComments,
+    isLoadingOnchain,
+    calculateTokenScore,
+  ]);
+
+  // Update purchase amount when slider changes or trade type changes
+  useEffect(() => {
+    if (!isCustomAmount) {
+      if (tradeType === "buy") {
+        // For buy, use calculatePurchaseAmount
+        const newAmount = calculatePurchaseAmount(selectedPurchasePercentage);
+        setTradeAmount(newAmount);
+      } else {
+        // For sell, calculate directly from token balance
+        const tokenBalanceNumber = Number(userTokenBalance) / 10 ** 18;
+        const tokenAmountToSell =
+          tokenBalanceNumber * (selectedPurchasePercentage / 100);
+
+        // Format the token amount appropriately
+        let formattedAmount = tokenAmountToSell.toString();
+        if (tokenAmountToSell < 0.00001) {
+          formattedAmount = tokenAmountToSell.toExponential(5);
+        } else if (tokenAmountToSell < 0.001) {
+          formattedAmount = tokenAmountToSell.toFixed(6);
+        } else if (tokenAmountToSell < 1) {
+          formattedAmount = tokenAmountToSell.toFixed(5);
+        } else {
+          formattedAmount = tokenAmountToSell.toFixed(2);
+        }
+
+        setTradeAmount(formattedAmount);
+      }
+    }
+  }, [
+    selectedPurchasePercentage,
+    calculatePurchaseAmount,
+    isCustomAmount,
+    tradeType,
+    userTokenBalance,
+  ]);
 
   return (
     <div className="retro-container p-2 border-2 border-retro-primary  items-center">
@@ -908,16 +1326,33 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
                 </div>
 
                 <div className="text-xs text-retro-secondary truncate mt-1 font-mono p-1 border border-retro-primary flex items-center justify-between">
-                  <span className="cursor-pointer">
-                    {tokenDetails.address}
-                  </span>
+                  <span className="cursor-pointer">{tokenDetails.address}</span>
                   <button
-                    onClick={() => navigator.clipboard.writeText(tokenDetails.address)}
+                    onClick={() =>
+                      navigator.clipboard.writeText(tokenDetails.address)
+                    }
                     className="hover:text-retro-accent transition-colors"
                     title="Copy address"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect
+                        x="9"
+                        y="9"
+                        width="13"
+                        height="13"
+                        rx="2"
+                        ry="2"
+                      ></rect>
                       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                     </svg>
                   </button>
@@ -935,11 +1370,19 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
               </div>
             )}
           </div>
-          {tokenDetails.description && (
-            <div className="mb-4 bg-black/20 p-3  border-2 border-retro-primary">
-              <h4 className="font-bold text-retro-primary text-xs mb-2 pixelated flex items-center">
+
+          {/* Tab Navigation */}
+          <div className="mb-4">
+            <div className="flex gap-1 p-1 bg-black/30 border-2 border-retro-primary rounded">
+              <button
+                onClick={() => setActiveTab("details")}
+                className={`flex-1 text-xs py-2 px-3 transition-all duration-200 pixelated font-bold flex items-center justify-center gap-1 ${
+                  activeTab === "details"
+                    ? "bg-retro-primary text-black shadow-[0_0_8px_rgba(255,107,53,0.5)]"
+                    : "text-retro-accent hover:bg-retro-primary/20"
+                }`}
+              >
                 <svg
-                  xmlns="http://www.w3.org/2000/svg"
                   width="12"
                   height="12"
                   viewBox="0 0 24 24"
@@ -948,269 +1391,900 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="mr-1"
                 >
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                  <polyline points="14 2 14 8 20 8"></polyline>
-                  <line x1="16" y1="13" x2="8" y2="13"></line>
-                  <line x1="16" y1="17" x2="8" y2="17"></line>
-                  <polyline points="10 9 9 9 8 9"></polyline>
+                  <path d="M3 3v18h18" />
+                  <path d="M7 12h10" />
+                  <path d="M7 8h10" />
+                  <path d="M7 16h6" />
                 </svg>
-                DESCRIPTION
-              </h4>
-              <p className="text-retro-accent whitespace-pre-line text-xs max-h-24 overflow-y-auto font-mono ">
-                {tokenDetails.description}
-              </p>
-            </div>
-          )}
-
-          {/* Token stats in grid layout */}
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            {tokenDetails.uniqueHolders && (
-              <div className=" p-2  border-2 border-retro-primary  transition-all">
-                <span className="text-retro-secondary text-xs font-bold block mb-1">
-                  HOLDERS
-                </span>
-                <span className="text-retro-accent text-sm font-mono">
-                  {tokenDetails.uniqueHolders}
-                </span>
-              </div>
-            )}
-            {tokenDetails.marketCap && (
-              <div className=" p-2  border-2 border-retro-primary  transition-all">
-                <span className="text-retro-secondary text-xs font-bold block mb-1">
-                  MARKET CAP
-                </span>
-                <span className="text-retro-accent text-sm font-mono">
-                  ${formatNumberWithAbbreviations(tokenDetails.marketCap)}
-                </span>
-              </div>
-            )}
-            {tokenDetails.volume24h && (
-              <div className=" p-2  border-2 border-retro-primary  transition-all">
-                <span className="text-retro-secondary text-xs font-bold block mb-1">
-                  24H VOLUME
-                </span>
-                <span className="text-retro-accent text-sm font-mono">
-                  ${formatNumberWithAbbreviations(tokenDetails.volume24h)}
-                </span>
-              </div>
-            )}
-            {tokenDetails.totalSupply && (
-              <div className=" p-2  border-2 border-retro-primary  transition-all">
-                <span className="text-retro-secondary text-xs font-bold block mb-1">
-                  SUPPLY
-                </span>
-                <span className="text-retro-accent text-sm font-mono">
-                  {formatNumberWithAbbreviations(tokenDetails.totalSupply)}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Description with better styling */}
-
-          {/* Trading section with improved UI */}
-          <div className="mt-5 mb-2">
-            <div className="flex items-center bg-gradient-to-r from-retro-primary/30 to-retro-primary/10 p-2  border border-retro-primary mb-3">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="mr-1 text-retro-accent"
-              >
-                <line x1="12" y1="1" x2="12" y2="23"></line>
-                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-              </svg>
-              <h4 className="font-bold text-retro-primary text-xs pixelated">
-                TRADE {tokenDetails.symbol}
-              </h4>
-            </div>
-
-            {isConnected && (
-              <div className="grid grid-cols-2 gap-2 text-xs mb-4">
-                <div className=" p-2  border border-retro-primary">
-                  <span className="text-retro-secondary font-bold block mb-1">
-                    YOUR ETH:
-                  </span>
-                  <span className="text-retro-accent font-mono">
-                    {formatBalance(userEthBalance)}
-                  </span>
-                </div>
-                <div className=" p-2  border border-retro-primary">
-                  <span className="text-retro-secondary font-bold block mb-1">
-                    YOUR {tokenDetails.symbol}:
-                  </span>
-                  <span className="text-retro-accent font-mono">
-                    {formatBalance(userTokenBalance)}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Trade type buttons with improved UI */}
-            <div className="flex gap-2 mb-4">
-              <RetroButton
-                onClick={() => handleTradeTypeChange("buy")}
-                variant={tradeType === "buy" ? "default" : "outline"}
-                className={`flex-1 text-xs py-2 transition-all duration-300 ${
-                  tradeType === "buy"
-                    ? "bg-retro-primary shadow-[0_0_10px_rgba(255,107,53,0.3)]"
-                    : "bg-transparent border-retro-primary hover:bg-retro-primary/10"
+                DETAILS
+              </button>
+              <button
+                onClick={() => setActiveTab("trade")}
+                className={`flex-1 text-xs py-2 px-3 transition-all duration-200 pixelated font-bold flex items-center justify-center gap-1 ${
+                  activeTab === "trade"
+                    ? "bg-retro-primary text-black shadow-[0_0_8px_rgba(255,107,53,0.5)]"
+                    : "text-retro-accent hover:bg-retro-primary/20"
                 }`}
               >
-                BUY {tokenDetails.symbol}
-              </RetroButton>
-              <RetroButton
-                onClick={() => handleTradeTypeChange("sell")}
-                variant={tradeType === "sell" ? "default" : "outline"}
-                className={`flex-1 text-xs py-2 transition-all duration-300 ${
-                  tradeType === "sell"
-                    ? "bg-retro-primary shadow-[0_0_10px_rgba(255,107,53,0.3)]"
-                    : "bg-transparent border-retro-primary hover:bg-retro-primary/10"
-                }`}
-              >
-                SELL {tokenDetails.symbol}
-              </RetroButton>
-            </div>
-
-            <div className=" p-3  border-2 border-retro-primary mb-4">
-              <div className="flex justify-between items-center mb-2">
-                <label className="retro-label text-xs text-retro-primary font-bold pixelated">
-                  {tradeType === "buy"
-                    ? `ETH AMOUNT TO USE`
-                    : `${tokenDetails.symbol} AMOUNT TO SELL`}
-                </label>
-
-                {/* Show balance in the label area */}
-              </div>
-
-              {/* Add sell mode indicator */}
-
-              <div className="relative">
-                <input
-                  type="number"
-                  step="0.001"
-                  min="0.001"
-                  className={`retro-input w-full mb-2 text-xs py-2 border-2 ${
-                    tradeType === "sell"
-                      ? "border-retro-accent text-retro-accent bg-black/80"
-                      : "border-retro-primary text-retro-accent bg-black/60"
-                  }`}
-                  value={tradeAmount}
-                  onChange={handleTradeAmountChange}
-                  placeholder={
-                    tradeType === "buy"
-                      ? "Enter ETH amount"
-                      : `Enter ${tokenDetails.symbol} amount`
-                  }
-                />
-              </div>
-
-              {/* Helper text for percentage selection */}
-
-              {/* Percentage buttons in flex layout */}
-              <div className="grid grid-cols-4 gap-1 mb-3">
-                {[10, 25, 50, 99].map((percent) => (
-                  <RetroButton
-                    key={percent}
-                    onClick={() => setPredefinedAmount(percent)}
-                    variant={
-                      selectedPurchasePercentage === percent && !isCustomAmount
-                        ? "default"
-                        : "outline"
-                    }
-                    className={`text-xs py-1 transition-all ${
-                      selectedPurchasePercentage === percent && !isCustomAmount
-                        ? "bg-retro-primary"
-                        : "bg-transparent border-retro-primary hover:bg-retro-primary/20"
-                    }`}
-                  >
-                    {percent === 99 ? "MAX" : `${percent}%`}
-                  </RetroButton>
-                ))}
-              </div>
-
-              {/* Slider with enhanced styling */}
-              <input
-                type="range"
-                min="1"
-                max="100"
-                value={selectedPurchasePercentage}
-                onChange={handleSliderChange}
-                className="w-full h-2 mb-3 appearance-none rounded-full bg-retro-primary/20 border-2 border-retro-primary"
-                style={{
-                  background: `linear-gradient(to right, var(--retro-primary) 0%, var(--retro-primary) ${selectedPurchasePercentage}%, rgba(255, 107, 53, 0.1) ${selectedPurchasePercentage}%, rgba(255, 107, 53, 0.1) 100%)`,
-                }}
-              />
-              <div className="text-xs text-retro-accent text-right font-mono p-1 ">
-                {tradeType === "buy"
-                  ? `≈ $${calculateUsdValue(
-                      tradeAmount
-                    )} USD (Receive: ~${estimateTokenAmount(tradeAmount)} ${
-                      tokenDetails.symbol
-                    })`
-                  : `≈ $${calculateUsdValue(
-                      tradeAmount
-                    )} USD (Receive: ~${estimateEthReturn(tradeAmount)} ETH)`}
-              </div>
-            </div>
-
-            {isConnected ? (
-              <RetroButton
-                onClick={handleTradeClick}
-                isLoading={isTrading}
-                fullWidth
-                className="text-xs bg-retro-primary hover:bg-retro-primary/90 transition-all duration-300 shadow-[0_0_10px_rgba(255,107,53,0.3)] hover:shadow-[0_0_15px_rgba(255,107,53,0.4)] border-2 border-retro-primary/70 py-3 font-bold"
-              >
-                {tradeType === "buy"
-                  ? `BUY ${tokenDetails.symbol} NOW`
-                  : `SELL ${tokenDetails.symbol} NOW`}
-              </RetroButton>
-            ) : (
-              <div className="text-center p-3 border border-retro-primary  ">
-                <p className="text-retro-secondary text-xs mb-2">
-                  Connect your wallet to trade this token
-                </p>
-                <div className="animate-pulse h-1 w-20 bg-retro-primary/30 mx-auto rounded"></div>
-              </div>
-            )}
-
-            {/* Trading tips section */}
-            <div className="text-xs text-retro-accent mt-4  p-3  border border-retro-primary">
-              <div className="flex items-center mb-2">
                 <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
+                  width="12"
+                  height="12"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="mr-1 text-retro-primary"
                 >
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <line x1="12" y1="8" x2="12" y2="12"></line>
-                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                  <line x1="12" y1="1" x2="12" y2="23" />
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                 </svg>
-                <p className="font-semibold text-retro-primary">
-                  TRADING TIPS:
-                </p>
-              </div>
-              <ul className="ml-5 space-y-1 list-disc">
-                <li>Received amounts may sometimes be inaccurate</li>
-                <li>Always leave some ETH for gas fees</li>
-              </ul>
+                TRADE
+              </button>
+              <button
+                onClick={() => setActiveTab("analysis")}
+                className={`flex-1 text-xs py-2 px-3 transition-all duration-200 pixelated font-bold flex items-center justify-center gap-1 ${
+                  activeTab === "analysis"
+                    ? "bg-retro-primary text-black shadow-[0_0_8px_rgba(255,107,53,0.5)]"
+                    : "text-retro-accent hover:bg-retro-primary/20"
+                }`}
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="9" cy="9" r="2" />
+                  <path d="M21 15l-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                </svg>
+                AI ANALYSIS
+              </button>
             </div>
           </div>
+
+          {/* Tab Content */}
+          {activeTab === "details" && (
+            <div>
+              {/* Description */}
+              {tokenDetails.description && (
+                <div className="mb-4 bg-black/20 p-3  border-2 border-retro-primary">
+                  <h4 className="font-bold text-retro-primary text-xs mb-2 pixelated flex items-center">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="mr-1"
+                    >
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <line x1="16" y1="13" x2="8" y2="13"></line>
+                      <line x1="16" y1="17" x2="8" y2="17"></line>
+                      <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    DESCRIPTION
+                  </h4>
+                  <p className="text-retro-accent whitespace-pre-line text-xs max-h-32 overflow-y-auto font-mono ">
+                    {tokenDetails.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Token Score Section */}
+              {tokenScore && (
+                <div className="mb-4 bg-gradient-to-br from-retro-primary/10 via-retro-primary/5 to-black/40 p-4 border-2 border-retro-primary shadow-[0_0_15px_rgba(255,107,53,0.2)]">
+                  <h4 className="font-bold  text-xs mb-3 pixelated flex items-center">
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="mr-2"
+                    >
+                      <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                      <polyline points="2 17 12 22 22 17" />
+                      <polyline points="2 12 12 17 22 12" />
+                    </svg>
+                    TOKEN SCORE & RATING
+                  </h4>
+
+                  {/* Overall Score */}
+                  <div className="mb-4 text-center p-3 border-2 border-retro-primary bg-black/30">
+                    <div
+                      className={`text-3xl font-bold pixelated mb-1 ${getScoreColor(
+                        tokenScore.overall
+                      )} drop-shadow-[0_0_8px_currentColor]`}
+                    >
+                      {tokenScore.overall}/100
+                    </div>
+                    <div className="text-xs font-bold pixelated text-retro-primary">
+                      {getScoreLabel(tokenScore.overall)}
+                    </div>
+                  </div>
+
+                  {/* Individual Scores */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-2 border-2 border-retro-primary bg-black/20">
+                      <div className="flex justify-between items-center">
+                        <span className="text-retro-primary text-xs font-bold">
+                          LIQUIDITY
+                        </span>
+                        <span className="text-retro-secondary text-xs font-bold">
+                          {tokenScore.liquidity}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-2 border-2 border-retro-primary bg-black/20">
+                      <div className="flex justify-between items-center">
+                        <span className="text-retro-primary text-xs font-bold">
+                          VOLUME
+                        </span>
+                        <span className="text-retro-secondary text-xs font-bold">
+                          {tokenScore.volume}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-2 border-2 border-retro-primary bg-black/20">
+                      <div className="flex justify-between items-center">
+                        <span className="text-retro-primary text-xs font-bold">
+                          COMMUNITY
+                        </span>
+                        <span className="text-retro-secondary text-xs font-bold">
+                          {tokenScore.community}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-2 border-2 border-retro-primary bg-black/20">
+                      <div className="flex justify-between items-center">
+                        <span className="text-retro-primary text-xs font-bold">
+                          RISK
+                        </span>
+                        <span className="text-retro-secondary text-xs font-bold">
+                          {tokenScore.risk}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-2 border-2 border-retro-primary bg-black/20">
+                      <div className="flex justify-between items-center">
+                        <span className="text-retro-primary text-xs font-bold">
+                          GROWTH
+                        </span>
+                        <span className="text-retro-secondary text-xs font-bold">
+                          {tokenScore.growth}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-2 border-2 border-retro-primary bg-black/20">
+                      <div className="flex justify-between items-center">
+                        <span className="text-retro-primary text-xs font-bold">
+                          TRANSFERS
+                        </span>
+                        <span className="text-retro-secondary text-xs font-bold">
+                          {formatNumberWithAbbreviations(
+                            tokenDetails.transfers?.count || 0
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 text-xs border-t-2 border-retro-primary pt-3">
+                    <div className="flex items-center">
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="mr-1 text-retro-primary"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      <span className="text-retro-primary opacity-80">
+                        Score based on liquidity, volume, community activity,
+                        and risk factors
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Token stats in grid layout */}
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                {tokenDetails.uniqueHolders && (
+                  <div className=" p-3  border-2 border-retro-primary  transition-all hover:border-retro-accent">
+                    <span className="text-retro-secondary text-xs font-bold block mb-1">
+                      HOLDERS
+                    </span>
+                    <span className="text-retro-accent text-sm font-mono">
+                      {tokenDetails.uniqueHolders}
+                    </span>
+                  </div>
+                )}
+                {tokenDetails.marketCap && (
+                  <div className=" p-3  border-2 border-retro-primary  transition-all hover:border-retro-accent">
+                    <span className="text-retro-secondary text-xs font-bold block mb-1">
+                      MARKET CAP
+                    </span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-retro-accent text-sm font-mono">
+                        ${formatNumberWithAbbreviations(tokenDetails.marketCap)}
+                      </span>
+                      {tokenDetails.marketCapDelta24h && (
+                        <span
+                          className={`text-xs font-mono ${
+                            parseFloat(tokenDetails.marketCapDelta24h) >= 0
+                              ? "text-green-400"
+                              : "text-red-400"
+                          }`}
+                        >
+                          {parseFloat(tokenDetails.marketCapDelta24h) >= 0
+                            ? "+"
+                            : ""}
+                          {formatNumberWithAbbreviations(
+                            tokenDetails.marketCapDelta24h
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {tokenDetails.volume24h && (
+                  <div className=" p-3  border-2 border-retro-primary  transition-all hover:border-retro-accent">
+                    <span className="text-retro-secondary text-xs font-bold block mb-1">
+                      24H VOLUME
+                    </span>
+                    <span className="text-retro-accent text-sm font-mono">
+                      ${formatNumberWithAbbreviations(tokenDetails.volume24h)}
+                    </span>
+                  </div>
+                )}
+                {tokenDetails.totalSupply && (
+                  <div className=" p-3  border-2 border-retro-primary  transition-all hover:border-retro-accent">
+                    <span className="text-retro-secondary text-xs font-bold block mb-1">
+                      TOTAL SUPPLY
+                    </span>
+                    <span className="text-retro-accent text-sm font-mono">
+                      {formatNumberWithAbbreviations(tokenDetails.totalSupply)}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Additional Token Info */}
+              <div className="grid grid-cols-1 gap-2">
+                {tokenDetails.totalVolume && (
+                  <div className=" p-3  border-2 border-retro-primary  transition-all hover:border-retro-accent">
+                    <span className="text-retro-secondary text-xs font-bold block mb-1">
+                      TOTAL VOLUME
+                    </span>
+                    <span className="text-retro-accent text-sm font-mono">
+                      ${formatNumberWithAbbreviations(tokenDetails.totalVolume)}
+                    </span>
+                  </div>
+                )}
+                {tokenDetails.createdAt && (
+                  <div className=" p-3  border-2 border-retro-primary  transition-all hover:border-retro-accent">
+                    <span className="text-retro-secondary text-xs font-bold block mb-1">
+                      CREATED
+                    </span>
+                    <span className="text-retro-accent text-sm font-mono">
+                      {formatDate(tokenDetails.createdAt)}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Onchain Data Section */}
+              {onchainData && !onchainData.hasError && (
+                <div className="mt-4">
+                  <h4 className="font-bold text-retro-primary text-xs mb-3 pixelated flex items-center">
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="mr-2"
+                    >
+                      <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                      <polyline points="2 17 12 22 22 17" />
+                      <polyline points="2 12 12 17 22 12" />
+                    </svg>
+                    ONCHAIN DATA
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {onchainData.liquidity && (
+                      <div className="p-3 border-2 border-retro-primary transition-all hover:border-retro-accent">
+                        <span className="text-retro-secondary text-xs font-bold block mb-1">
+                          LIQUIDITY
+                        </span>
+                        <span className="text-retro-accent text-sm font-mono">
+                          {onchainData.liquidity.formatted} ETH
+                        </span>
+                        {onchainData.liquidity.usdcDecimal > 0 && (
+                          <span className="text-retro-secondary text-xs block">
+                            ≈ ${onchainData.liquidity.usdcDecimal.toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <div className="p-3 border-2 border-retro-primary transition-all hover:border-retro-accent">
+                      <span className="text-retro-secondary text-xs font-bold block mb-1">
+                        OWNERS
+                      </span>
+                      <span className="text-retro-accent text-sm font-mono">
+                        {onchainData.ownersCount || 0}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Loading state for onchain data */}
+              {isLoadingOnchain && (
+                <div className="mt-4 p-3 border-2 border-retro-primary text-center">
+                  <div className="retro-loading mx-auto mb-2">
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                  </div>
+                  <p className="text-retro-secondary text-xs">
+                    Loading onchain data...
+                  </p>
+                </div>
+              )}
+
+              {/* Comments Section */}
+              <div className="mt-6">
+                <h4 className="font-bold text-retro-primary text-xs mb-3 pixelated flex items-center justify-between">
+                  <div className="flex items-center">
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="mr-2"
+                    >
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
+                    COMMUNITY COMMENTS
+                  </div>
+                  {totalCommentsCount > 0 && (
+                    <span className="text-retro-accent text-xs">
+                      {totalCommentsCount} total
+                    </span>
+                  )}
+                </h4>
+
+                {isLoadingComments && comments.length === 0 ? (
+                  <div className="p-4 border-2 border-retro-primary text-center">
+                    <div className="retro-loading mx-auto mb-2">
+                      <div></div>
+                      <div></div>
+                      <div></div>
+                    </div>
+                    <p className="text-retro-secondary text-xs">
+                      Loading comments...
+                    </p>
+                  </div>
+                ) : comments.length > 0 ? (
+                  <div className="space-y-3">
+                    {comments.map((comment: Comment, index: number) => (
+                      <div
+                        key={comment.node.txHash || index}
+                        className="p-3 border border-retro-primary bg-black/20 transition-all hover:border-retro-accent"
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center">
+                            <div className="w-6 h-6 bg-retro-primary/20 border border-retro-primary rounded flex items-center justify-center mr-2">
+                              {comment.node.userProfile.avatar?.previewImage
+                                ?.small ? (
+                                <img
+                                  src={
+                                    comment.node.userProfile.avatar.previewImage
+                                      .small
+                                  }
+                                  alt={comment.node.userProfile.handle}
+                                  className="w-full h-full rounded object-cover"
+                                />
+                              ) : (
+                                <span className="text-retro-primary text-xs font-bold">
+                                  {comment.node.userProfile.handle
+                                    ?.charAt(0)
+                                    ?.toUpperCase() || "?"}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-retro-accent text-xs font-mono">
+                              {comment.node.userProfile.handle || "Anonymous"}
+                            </span>
+                          </div>
+                          <span className="text-retro-secondary text-xs">
+                            {comment.node.timestamp
+                              ? new Date(
+                                  comment.node.timestamp * 1000
+                                ).toLocaleDateString()
+                              : ""}
+                          </span>
+                        </div>
+                        <p className="text-retro-accent text-xs leading-relaxed">
+                          {comment.node.comment || "No comment text"}
+                        </p>
+                        {comment.node.replies &&
+                          comment.node.replies.count > 0 && (
+                            <div className="mt-2 text-retro-secondary text-xs">
+                              💬 {comment.node.replies.count}{" "}
+                              {comment.node.replies.count === 1
+                                ? "reply"
+                                : "replies"}
+                            </div>
+                          )}
+                      </div>
+                    ))}
+
+                    {/* Load More Button */}
+                    {commentsPageInfo?.hasNextPage && (
+                      <div className="text-center pt-3">
+                        <RetroButton
+                          onClick={loadMoreComments}
+                          isLoading={isLoadingComments}
+                          variant="outline"
+                          className="text-xs bg-transparent border-retro-primary hover:bg-retro-primary/20"
+                        >
+                          {isLoadingComments
+                            ? "Loading..."
+                            : "Load More Comments"}
+                        </RetroButton>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-4 border-2 border-retro-primary text-center">
+                    <p className="text-retro-secondary text-xs">
+                      No comments yet
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "trade" && (
+            <div>
+              {/* User Balance Info */}
+              {isConnected && (
+                <div className="grid grid-cols-2 gap-2 text-xs mb-4">
+                  <div className=" p-3  border-2 border-retro-primary">
+                    <span className="text-retro-secondary font-bold block mb-1">
+                      YOUR ETH:
+                    </span>
+                    <span className="text-retro-accent font-mono text-sm">
+                      {formatBalance(userEthBalance)}
+                    </span>
+                  </div>
+                  <div className=" p-3  border-2 border-retro-primary">
+                    <span className="text-retro-secondary font-bold block mb-1">
+                      YOUR {tokenDetails.symbol}:
+                    </span>
+                    <span className="text-retro-accent font-mono text-sm">
+                      {formatBalance(userTokenBalance)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Trade type buttons with improved UI */}
+              <div className="flex gap-2 mb-4">
+                <RetroButton
+                  onClick={() => handleTradeTypeChange("buy")}
+                  variant={tradeType === "buy" ? "default" : "outline"}
+                  className={`flex-1 text-xs py-3 transition-all duration-300 ${
+                    tradeType === "buy"
+                      ? "bg-retro-primary shadow-[0_0_10px_rgba(255,107,53,0.3)]"
+                      : "bg-transparent border-retro-primary hover:bg-retro-primary/10"
+                  }`}
+                >
+                  BUY
+                </RetroButton>
+                <RetroButton
+                  onClick={() => handleTradeTypeChange("sell")}
+                  variant={tradeType === "sell" ? "default" : "outline"}
+                  className={`flex-1 text-xs py-3 transition-all duration-300 ${
+                    tradeType === "sell"
+                      ? "bg-retro-primary shadow-[0_0_10px_rgba(255,107,53,0.3)]"
+                      : "bg-transparent border-retro-primary hover:bg-retro-primary/10"
+                  }`}
+                >
+                  SELL
+                </RetroButton>
+              </div>
+
+              <div className=" p-4  border-2 border-retro-primary mb-4">
+                <div className="flex justify-between items-center mb-3">
+                  <label className="retro-label text-xs text-retro-primary font-bold pixelated">
+                    {tradeType === "buy"
+                      ? `ETH AMOUNT TO USE`
+                      : `${tokenDetails.symbol} - AMOUNT TO SELL`}
+                  </label>
+                </div>
+
+                <div className="relative mb-3">
+                  <input
+                    type="number"
+                    step="0.001"
+                    min="0.001"
+                    className={`retro-input w-full text-xs py-3 border-2 ${
+                      tradeType === "sell"
+                        ? "border-retro-accent text-retro-accent bg-black/80"
+                        : "border-retro-primary text-retro-accent bg-black/60"
+                    }`}
+                    value={tradeAmount}
+                    onChange={handleTradeAmountChange}
+                    placeholder={
+                      tradeType === "buy"
+                        ? "Enter ETH amount"
+                        : `Enter ${tokenDetails.symbol} amount`
+                    }
+                  />
+                </div>
+
+                {/* Percentage buttons in flex layout */}
+                <div className="grid grid-cols-4 gap-2 mb-4">
+                  {[10, 25, 50, 99].map((percent) => (
+                    <RetroButton
+                      key={percent}
+                      onClick={() => setPredefinedAmount(percent)}
+                      variant={
+                        selectedPurchasePercentage === percent &&
+                        !isCustomAmount
+                          ? "default"
+                          : "outline"
+                      }
+                      className={`text-xs py-2 transition-all ${
+                        selectedPurchasePercentage === percent &&
+                        !isCustomAmount
+                          ? "bg-retro-primary"
+                          : "bg-transparent border-retro-primary hover:bg-retro-primary/20"
+                      }`}
+                    >
+                      {percent === 99 ? "MAX" : `${percent}%`}
+                    </RetroButton>
+                  ))}
+                </div>
+
+                {/* Slider with enhanced styling */}
+                <input
+                  type="range"
+                  min="1"
+                  max="100"
+                  value={selectedPurchasePercentage}
+                  onChange={handleSliderChange}
+                  className="w-full h-2 mb-4 appearance-none rounded-full bg-retro-primary/20 border-2 border-retro-primary"
+                  style={{
+                    background: `linear-gradient(to right, var(--retro-primary) 0%, var(--retro-primary) ${selectedPurchasePercentage}%, rgba(255, 107, 53, 0.1) ${selectedPurchasePercentage}%, rgba(255, 107, 53, 0.1) 100%)`,
+                  }}
+                />
+                <div className="text-xs text-retro-accent text-center font-mono p-2 bg-black/20 border border-retro-primary">
+                  {tradeType === "buy"
+                    ? `≈ $${calculateUsdValue(
+                        tradeAmount
+                      )} USD (Receive: ~${estimateTokenAmount(tradeAmount)} ${
+                        tokenDetails.symbol
+                      })`
+                    : `≈ $${calculateUsdValue(
+                        tradeAmount
+                      )} USD (Receive: ~${estimateEthReturn(tradeAmount)} ETH)`}
+                </div>
+              </div>
+
+              {isConnected ? (
+                <RetroButton
+                  onClick={handleTradeClick}
+                  isLoading={isTrading}
+                  fullWidth
+                  className="text-sm bg-retro-primary hover:bg-retro-primary/90 transition-all duration-300 shadow-[0_0_10px_rgba(255,107,53,0.3)] hover:shadow-[0_0_15px_rgba(255,107,53,0.4)] border-2 border-retro-primary/70 py-4 font-bold pixelated"
+                >
+                  {tradeType === "buy"
+                    ? `BUY ${tokenDetails.symbol} NOW`
+                    : `SELL ${tokenDetails.symbol} NOW`}
+                </RetroButton>
+              ) : (
+                <div className="text-center p-4 border-2 border-retro-primary  ">
+                  <p className="text-retro-secondary text-xs mb-2">
+                    Connect your wallet to trade this token
+                  </p>
+                  <div className="animate-pulse h-1 w-20 bg-retro-primary/30 mx-auto rounded"></div>
+                </div>
+              )}
+
+              {/* Trading tips section */}
+              <div className="text-xs text-retro-accent mt-4  p-3  border border-retro-primary">
+                <div className="flex items-center mb-2">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="mr-1 text-retro-primary"
+                  >
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                  </svg>
+                  <p className="font-semibold text-retro-primary pixelated">
+                    TRADING TIPS:
+                  </p>
+                </div>
+                <ul className="ml-5 space-y-1 list-disc">
+                  <li>Received amounts may sometimes be inaccurate</li>
+                  <li>Always leave some ETH for gas fees</li>
+                  <li>Larger trades may have higher slippage</li>
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "analysis" && (
+            <div>
+              {/* Analysis Question Input */}
+              <div className="mb-4">
+                <label className="text-retro-primary text-xs font-bold mb-3 pixelated flex items-center">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="mr-2"
+                  >
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24" />
+                  </svg>
+                  ASK ABOUT THIS TOKEN:
+                </label>
+                <input
+                  type="text"
+                  className="retro-input w-full text-xs py-3 border-2 border-retro-primary text-retro-accent bg-black/60 mb-4"
+                  value={analysisQuestion}
+                  onChange={(e) => setAnalysisQuestion(e.target.value)}
+                  placeholder="What would you like to know about this token?"
+                />
+
+                {/* Quick Question Buttons */}
+                <div className="grid grid-cols-1 gap-2 mb-4 text-xs">
+                  <RetroButton
+                    onClick={() =>
+                      setAnalysisQuestion("Is this token a good investment?")
+                    }
+                    variant="outline"
+                    className="text-xs py-2 bg-transparent border-retro-primary hover:bg-retro-primary/20 text-left flex items-center"
+                  >
+                    Is this token a good investment?
+                  </RetroButton>
+                  <RetroButton
+                    onClick={() =>
+                      setAnalysisQuestion(
+                        "What are the risks of investing in this token?"
+                      )
+                    }
+                    variant="outline"
+                    className="text-xs py-2 bg-transparent border-retro-primary hover:bg-retro-primary/20 text-left flex items-center"
+                  >
+                    What are the risks of this token?
+                  </RetroButton>
+                  <RetroButton
+                    onClick={() =>
+                      setAnalysisQuestion(
+                        "How does this token compare to similar projects?"
+                      )
+                    }
+                    variant="outline"
+                    className="text-[10px] py-2 bg-transparent border-retro-primary hover:bg-retro-primary/20 text-left flex items-center"
+                  >
+                    How does it compare to others?
+                  </RetroButton>
+                </div>
+              </div>
+
+              {/* Analysis Button */}
+              <RetroButton
+                onClick={handleAnalyzeToken}
+                isLoading={isAnalyzing}
+                fullWidth
+                className="text-sm bg-retro-primary hover:bg-retro-primary/90 transition-all duration-300 shadow-[0_0_10px_rgba(255,107,53,0.3)] hover:shadow-[0_0_15px_rgba(255,107,53,0.4)] border-2 border-retro-primary/70 py-4 font-bold pixelated mb-4 flex items-center justify-center"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="mr-2"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="9" cy="9" r="2" />
+                  <path d="M21 15l-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                </svg>
+                {isAnalyzing ? "ANALYZING TOKEN..." : "ANALYZE TOKEN WITH AI"}
+              </RetroButton>
+
+              {/* Analysis Results */}
+              {analysisResult && (
+                <div className="bg-gradient-to-br from-retro-primary/15 via-retro-primary/5 to-black/40 p-4 border-2 border-retro-primary shadow-[0_0_15px_rgba(255,107,53,0.2)] rounded">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center">
+                      <div className="w-8 h-8 bg-retro-primary/20 border-2 border-retro-primary rounded flex items-center justify-center mr-3">
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="text-retro-primary"
+                        >
+                          <rect
+                            x="3"
+                            y="3"
+                            width="18"
+                            height="18"
+                            rx="2"
+                            ry="2"
+                          />
+                          <circle cx="9" cy="9" r="2" />
+                          <path d="M21 15l-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h5 className="text-retro-primary text-sm font-bold pixelated">
+                          AI ANALYSIS RESULTS
+                        </h5>
+                        <p className="text-retro-secondary text-xs">
+                          Generated analysis for {tokenDetails.symbol}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setAnalysisResult(null)}
+                      className="text-retro-secondary hover:text-retro-accent transition-colors p-1 hover:bg-retro-primary/10 rounded"
+                      title="Clear analysis"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div className="bg-black/60 border-2 border-retro-primary rounded p-4">
+                    <div className="max-h-80 overflow-y-auto font-mono text-sm leading-relaxed">
+                      {formatAnalysisText(analysisResult)}
+                    </div>
+                  </div>
+
+                  {/* Analysis Footer */}
+                  <div className="mt-4 pt-3 border-t border-retro-primary flex items-center justify-between">
+                    <div className="flex items-center text-xs text-retro-secondary">
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="mr-1"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      Analysis based on available token data
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() =>
+                          navigator.clipboard.writeText(analysisResult)
+                        }
+                        className="text-xs text-retro-accent hover:text-retro-primary transition-colors px-2 py-1 border border-retro-primary rounded hover:bg-retro-primary/10"
+                      >
+                        Copy
+                      </button>
+                      <button
+                        onClick={handleAnalyzeToken}
+                        className="text-xs text-retro-accent hover:text-retro-primary transition-colors px-2 py-1 border border-retro-primary rounded hover:bg-retro-primary/10"
+                      >
+                        Re-analyze
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Analysis Info */}
+              <div className="text-xs text-retro-accent mt-4 p-3 border border-retro-primary bg-black/20">
+                <div className="flex items-center mb-2">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="mr-1 text-retro-primary"
+                  >
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                  </svg>
+                  <p className="font-semibold text-retro-primary pixelated">
+                    ANALYSIS INFO:
+                  </p>
+                </div>
+                <ul className="ml-5 space-y-1 list-disc">
+                  <li>Analysis is based on available token metrics and data</li>
+                  <li>Not financial advice - do your own research</li>
+                  <li>Results may take a few seconds to generate</li>
+                </ul>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="text-center p-5 border-2 border-retro-primary  bg-black/70">

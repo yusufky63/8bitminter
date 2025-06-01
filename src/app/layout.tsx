@@ -29,7 +29,7 @@ export default function RootLayout({
       title: "Start Minting",
       action: {
         type: "launch_frame",
-        name: "8BitMinter",
+        name: "8BitCoiner",
         url: baseUrl,
         splashImageUrl: `${baseUrl}/logo.png`,
         splashBackgroundColor: "#181028"
@@ -40,7 +40,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <title>8BitMinter</title>
+        <title>8BitCoiner</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <meta
           name="description"
@@ -54,7 +54,7 @@ export default function RootLayout({
         <link rel="farcaster-app-config" href="/.well-known/farcaster.json" />
         
         {/* OpenGraph Meta Tags */}
-        <meta property="og:title" content="8BitMinter" />
+        <meta property="og:title" content="8BitCoiner" />
         <meta
           property="og:description"
           content="Create retro-styled tokens on the blockchain with AI-generated art"
@@ -65,7 +65,7 @@ export default function RootLayout({
         
         {/* Twitter Meta Tags */}
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="8BitMinter" />
+        <meta name="twitter:title" content="8BitCoiner" />
         <meta name="twitter:description" content="Create retro-style tokens on Base" />
         <meta name="twitter:image" content={`${baseUrl}/opengraph-image.png`} />
         

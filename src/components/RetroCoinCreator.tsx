@@ -255,12 +255,12 @@ export default function RetroCoinCreator() {
       const apiUrl = `${window.location.origin}/api/ai`;
       console.log("🔄 Sending request to:", apiUrl);
       
-      // Timeout controller
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => {
-        controller.abort();
-        console.warn("⏱️ Request timeout triggered");
-      }, 25000); // Increased timeout
+      // Timeout controller kaldırıldı - backend ile uyumlu sınırsız bekleme
+      // const controller = new AbortController();
+      // const timeoutId = setTimeout(() => {
+      //   controller.abort();
+      //   console.warn("⏱️ Request timeout triggered");
+      // }, 25000); // Increased timeout
       
       try {
         console.log("📤 Request payload:", {
@@ -279,10 +279,10 @@ export default function RetroCoinCreator() {
             category: formData.category,
             description: formData.description
           }),
-          signal: controller.signal
+          // signal: controller.signal
         });
         
-        clearTimeout(timeoutId);
+        // clearTimeout(timeoutId);
         console.log("📥 Response status:", response.status);
         
         if (!response.ok) {
@@ -338,7 +338,7 @@ export default function RetroCoinCreator() {
         console.log("✅ Moving to next step");
         setStep(2);
       } catch (fetchError: unknown) {
-        clearTimeout(timeoutId);
+        // clearTimeout(timeoutId);
         
         console.error("❌ Fetch error:", fetchError);
         
@@ -440,116 +440,117 @@ export default function RetroCoinCreator() {
     // Track retries
     let attempts = 0;
     const maxAttempts = 3;
+    let lastError = null;
     
-    while (attempts < maxAttempts) {
-      attempts++;
-      
-      try {
-        // Set loading state
-        setIsLoading(true);
-        setError("");
-        
-        // Display attempt information if retrying
-        if (attempts > 1) {
-          toast.loading(`Retrying image generation (attempt ${attempts}/${maxAttempts})...`, {
-            id: 'status-toast'
-          });
-        } else {
-          toast.loading("Generating token image...", {
-            id: 'status-toast'
-          });
-        }
-        
-        // Call the image generation API with AI-enhanced description
-        const response = await fetch("/api/ai", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "image",
-            name: formData.name,
-            symbol: formData.symbol,
-            description: imageDescription, // Use AI-enhanced description
-          }),
-          // Increased timeout for image generation
-          signal: AbortSignal.timeout(30000) // 30 second timeout
-        });
-        
-        // Check response status
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          const errorMessage = errorData.error || `Server error: ${response.status}`;
-          throw new Error(errorMessage);
-        }
-        
-        // Parse response data
-        const data = await response.json();
-        
-        // Check for image URL in response
-        if (!data.imageUrl) {
-          throw new Error("No image URL returned from API");
-        }
-        
-        console.log("Image generation API response:", data);
-        
-        // API'den gelen URL'yi doğrudan kullanarak metadata yarat ve IPFS'e yükle
-        console.log("Processing image URL through IPFS...");
-        toast.loading("Uploading to IPFS...", { id: 'status-toast' });
+    // Set initial loading state
+    setIsLoading(true);
+    setError("");
+    
+    try {
+      while (attempts < maxAttempts) {
+        attempts++;
         
         try {
-          // Together.ai URL'sinden metadata yarat ve IPFS'e yükle
-          const processedImage = await processTtlgenHerImage(
-            data.imageUrl,
-            formData.name,
-            formData.symbol,
-            aiSuggestion?.description || formData.description  // AI açıklamasını öncelikle kullan
-          );
-        
-          // Update form data with IPFS URI
-        setFormData(prev => ({
-          ...prev,
-            imageUrl: processedImage.ipfsUri
-        }));
-        
-        // Set display URL for UI
-          setDisplayImageUrl(data.imageUrl);
+          // Display attempt information if retrying
+          if (attempts > 1) {
+            toast.loading(`Retrying image generation (attempt ${attempts}/${maxAttempts})...`, {
+              id: 'status-toast'
+            });
+          } else {
+            toast.loading("Generating token image...", {
+              id: 'status-toast'
+            });
+          }
           
-          toast.success("Image metadata uploaded to IPFS successfully!", { 
-          id: 'status-toast'
-        });
+          // Call the image generation API with AI-enhanced description
+          const response = await fetch("/api/ai", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "image",
+              name: formData.name,
+              symbol: formData.symbol,
+              description: imageDescription, // Use AI-enhanced description
+            }),
+            // Timeout kaldırıldı - sınırsız bekleme süresi backend ile uyumlu
+            // signal: AbortSignal.timeout(30000) // 30 second timeout
+          });
           
-          console.log("IPFS process completed successfully");
-        
-        // Move to next step automatically
-        setStep(3);
+          // Check response status
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMessage = errorData.error || `Server error: ${response.status}`;
+            throw new Error(errorMessage);
+          }
           
-          // Break out of retry loop
-          break;
-        } catch (ipfsError) {
-          console.error("Failed to process image through IPFS:", ipfsError);
-          throw new Error(`Failed to upload to IPFS: ${ipfsError instanceof Error ? ipfsError.message : "Unknown error"}`);
+          // Parse response data
+          const data = await response.json();
+          
+          // Check for image URL in response
+          if (!data.imageUrl) {
+            throw new Error("No image URL returned from API");
+          }
+          
+          console.log("Image generation API response:", data);
+          
+          // API'den gelen URL'yi doğrudan kullanarak metadata yarat ve IPFS'e yükle
+          console.log("Processing image URL through IPFS...");
+          toast.loading("Uploading to IPFS...", { id: 'status-toast' });
+          
+          try {
+            // Together.ai URL'sinden metadata yarat ve IPFS'e yükle
+            const processedImage = await processTtlgenHerImage(
+              data.imageUrl,
+              formData.name,
+              formData.symbol,
+              aiSuggestion?.description || formData.description  // AI açıklamasını öncelikle kullan
+            );
+          
+            // Update form data with IPFS URI
+            setFormData(prev => ({
+              ...prev,
+                imageUrl: processedImage.ipfsUri
+            }));
+          
+            // Set display URL for UI
+            setDisplayImageUrl(data.imageUrl);
+              
+            toast.success("Image metadata uploaded to IPFS successfully!", { 
+              id: 'status-toast'
+            });
+              
+            console.log("IPFS process completed successfully");
+          
+            // Move to next step automatically
+            setStep(3);
+              
+            // Success! Break out of retry loop
+            return;
+          } catch (ipfsError) {
+            console.error("Failed to process image through IPFS:", ipfsError);
+            throw new Error(`Failed to upload to IPFS: ${ipfsError instanceof Error ? ipfsError.message : "Unknown error"}`);
+          }
+        } catch (error) {
+          lastError = error;
+          console.error(`Image generation attempt ${attempts} failed:`, error);
+          
+          // Show appropriate toast based on attempt status
+          if (attempts < maxAttempts) {
+            toast.error(`Attempt ${attempts} failed, retrying...`, { id: 'status-toast' });
+            // Wait before retry (rate limit için daha uzun bekleme)
+            const waitTime = error instanceof Error && error.message.includes("Rate limit") ? 5000 : 2000;
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          } else {
+            // Final attempt failed
+            toast.error(`Image generation failed after ${maxAttempts} attempts`, { id: 'status-toast' });
+            setError(`Failed to generate image after ${maxAttempts} attempts: ${error instanceof Error ? error.message : "Unknown error"}`);
+          }
         }
-      } catch (error) {
-        console.error(`Image generation attempt ${attempts} failed:`, error);
-        
-        // Show error in toast
-        toast.error(
-          `Image generation ${attempts < maxAttempts ? "attempt" : "failed"}: ${error instanceof Error ? error.message : "Unknown error"}`, 
-          { id: 'status-toast' }
-        );
-        
-        // Set error state
-        if (attempts >= maxAttempts) {
-          setError(`Failed to generate image after ${maxAttempts} attempts: ${error instanceof Error ? error.message : "Unknown error"}`);
-        }
-        
-        // Wait before retry
-        if (attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-      } finally {
-        setIsLoading(false);
-        setCreatingImage(false);
       }
+    } finally {
+      // Only clear loading states when ALL attempts are complete
+      setIsLoading(false);
+      setCreatingImage(false);
     }
   }, [formData, isLoading, aiSuggestion]);
 

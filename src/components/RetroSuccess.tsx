@@ -3,14 +3,7 @@ import Image from "next/image";
 import { RetroStepScreen } from "./RetroStepScreen";
 import { RetroDivider } from "./RetroDivider";
 import { RetroButton } from "./ui/RetroButton";
-// Import only if needed for types, but don't use directly
-// import { sdk } from '@farcaster/frame-sdk';
 
-// Define the expected Farcaster SDK actions interface
-interface FarcasterSdkActions {
-  ready: () => Promise<void>;
-  composeCast?: (options: { text: string }) => Promise<void>;
-}
 
 interface RetroSuccessProps {
   contractAddress: string;
@@ -42,7 +35,7 @@ export function RetroSuccess({
   const shareOnWarpcast = async () => {
     try {
       // Create share text with token details and links - now with mini app link
-      const shareText = `I just created ${tokenName} (${tokenSymbol}) on Base network using 8BitMinter! 🚀\n\n${description}\n\nView on Zora: https://zora.co/coin/${contractAddress}\n\nCreate your own: https://warpcast.com/miniapps/VJFTWn45l8cA/8bitminter`;
+      const shareText = `I just created ${tokenName} (${tokenSymbol}) on Base network using 8BitCoiner! 🚀\n\n${description}\n\nView on Zora: https://zora.co/coin/${contractAddress}\n\nCreate your own: https://warpcast.com/miniapps/VJFTWn45l8cA/8bitminter`;
       
       // Try to use dynamic import to get the SDK if in browser
       if (typeof window !== 'undefined') {
@@ -71,11 +64,11 @@ export function RetroSuccess({
       }
       
       // Direct URL fallback if not in Warpcast environment
-      window.open(`https://warpcast.com/~/compose?text=${encodeURIComponent(shareText)}`, '_blank');
+      window.open(`https://farcaster.com/~/compose?text=${encodeURIComponent(shareText)}`, '_blank');
     } catch (error) {
       console.error("Error sharing to Warpcast:", error);
       // Fallback to copy to clipboard - also updated with mini app link
-      navigator.clipboard.writeText(`I just created ${tokenName} (${tokenSymbol}) on Base network using 8BitMinter! 🚀\n\n${description}\n\nView on Zora: https://zora.co/coin/${contractAddress}\n\nCreate your own: https://warpcast.com/miniapps/VJFTWn45l8cA/8bitminter`);
+      navigator.clipboard.writeText(`I just created ${tokenName} (${tokenSymbol}) on Base network using 8BitCoiner! 🚀\n\n${description}\n\nView on Zora: https://zora.co/coin/${contractAddress}\n\nCreate your own: https://warpcast.com/miniapps/VJFTWn45l8cA/8bitminter`);
       alert("Share text copied to clipboard. You can paste it in Warpcast.");
     }
   };
@@ -256,7 +249,7 @@ export function RetroSuccess({
           <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
           <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
         </svg>
-        SHARE ON WARPCAST
+        SHARE ON FARCASTER
       </RetroButton>
     </RetroStepScreen>
   );

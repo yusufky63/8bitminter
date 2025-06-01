@@ -81,7 +81,7 @@ async function sendNotification(url: string, token: string, message: string) {
       },
       body: JSON.stringify({
         notificationId: `notification-${Date.now()}`,
-        title: '8BitMinter Update',
+        title: '8BitCoiner Update',
         body: message,
         targetUrl: 'https://8bitminter.vercel.app',
         tokens: [token],
