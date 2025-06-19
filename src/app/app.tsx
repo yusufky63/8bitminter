@@ -41,7 +41,7 @@ const CoinHolderView = dynamic(
 
 const CoinExplorer = dynamic(
   () => import("../components/RetroCoinExplorer").catch(err => {
-    console.error("[APP] Error importing CoinExplorer:", err);
+    console.error("[APP] Error importing RetroCoinExplorer:", err);
     const FallbackComponent = () => (
       <div className="retro-container p-4">
         <h2 className="retro-header text-lg mb-4">Explore Tokens</h2>

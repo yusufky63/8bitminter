@@ -37,61 +37,35 @@ export const getPublicClient = () => {
 const safeFormatEther = (value) => {
   if (value === undefined || value === null) return "0";
   
-  // Handle object types (marketCap, liquidity, etc.)
-  if (typeof value === 'object' && !BigInt.prototype.isPrototypeOf(value)) {
-    // If eth value exists, use it
-    if (value.eth !== undefined) {
-      try {
-        return formatEther(value.eth);
-      } catch (error) {
-        console.warn("formatEther(eth) error:", error);
-        // If ethDecimal exists, convert it directly to string
-        if (value.ethDecimal !== undefined) {
-          return value.ethDecimal.toString();
-        }
-        return "0";
-      }
+  // Handle BigInt values directly (as per SDK documentation)
+  try {
+    if (typeof value === 'bigint') {
+      return formatEther(value);
     }
-    // If ethDecimal exists but no eth
-    if (value.ethDecimal !== undefined) {
-      return value.ethDecimal.toString();
+    
+    // Handle string representation of BigInt
+    if (typeof value === 'string' && value !== "0") {
+      return formatEther(BigInt(value));
     }
     
     return "0";
-  }
-  
-  // Handle normal BigInt values
-  try {
-    return formatEther(value);
   } catch (error) {
-    console.warn("formatEther error:", error);
+    console.warn("formatEther error:", error, "value:", value);
     return "0";
   }
 };
 
 /**
  * Format onchain detail values for safe serialization
- * @param {any} detail - Detail value to format
+ * @param {any} detail - Detail value to format (BigInt according to SDK docs)
  * @returns {object} Formatted detail object
  */
 const formatOnchainDetail = (detail) => {
   if (!detail) return { raw: "0", formatted: "0" };
   
-  // Handle object types (marketCap, liquidity, etc.)
-  if (typeof detail === 'object' && !BigInt.prototype.isPrototypeOf(detail)) {
-    return {
-      raw: detail,
-      formatted: safeFormatEther(detail),
-      eth: detail.eth ? detail.eth.toString() : "0",
-      ethDecimal: detail.ethDecimal || 0,
-      usdc: detail.usdc ? detail.usdc.toString() : "0",
-      usdcDecimal: detail.usdcDecimal || 0
-    };
-  }
-  
-  // Handle BigInt or other types
+  // According to SDK docs, values are BigInt
   return {
-    raw: detail ? detail.toString() : "0",
+    raw: detail.toString(),
     formatted: safeFormatEther(detail)
   };
 };
@@ -112,7 +86,7 @@ export const getOnchainTokenDetails = async (tokenAddress, userAddress = null) =
     const publicClient = getPublicClient();
     
     // Use Zora SDK to fetch coin data from blockchain
-    // Important: only add user parameter if userAddress is valid
+    // Format according to SDK documentation
     const params = {
       coin: tokenAddress,
       publicClient,
@@ -123,7 +97,7 @@ export const getOnchainTokenDetails = async (tokenAddress, userAddress = null) =
     const details = await getOnchainCoinDetails(params);
     console.log("Raw onchain details received:", details);
     
-    // Format and return coin details
+    // Format according to SDK documentation structure
     const tokenDetails = {
       address: details.address || tokenAddress,
       name: details.name || "Unknown Token",
@@ -139,18 +113,6 @@ export const getOnchainTokenDetails = async (tokenAddress, userAddress = null) =
       // Add user balance if available
       ...(details.balance ? {
         userBalance: formatOnchainDetail(details.balance)
-      } : {}),
-      // Add pool state if available
-      ...(details.poolState ? { 
-        poolState: {
-          sqrtPriceX96: details.poolState.sqrtPriceX96?.toString() || "0",
-          tick: details.poolState.tick?.toString() || "0",
-          observationIndex: details.poolState.observationIndex || 0,
-          observationCardinality: details.poolState.observationCardinality || 0,
-          observationCardinalityNext: details.poolState.observationCardinalityNext || 0,
-          feeProtocol: details.poolState.feeProtocol || 0,
-          unlocked: details.poolState.unlocked || false
-        }
       } : {}),
       // Metadata
       fetchedAt: new Date().toISOString(),
@@ -178,19 +140,11 @@ export const getOnchainTokenDetails = async (tokenAddress, userAddress = null) =
       ownersCount: 0,
       marketCap: {
         raw: "0",
-        formatted: "0",
-        eth: "0",
-        ethDecimal: 0,
-        usdc: "0",
-        usdcDecimal: 0
+        formatted: "0"
       },
       liquidity: {
         raw: "0",
-        formatted: "0",
-        eth: "0",
-        ethDecimal: 0,
-        usdc: "0",
-        usdcDecimal: 0
+        formatted: "0"
       },
       payoutRecipient: "0x0000000000000000000000000000000000000000",
       fetchedAt: new Date().toISOString(),
@@ -211,7 +165,6 @@ export const getLiquidityInfo = (onchainData) => {
   const liquidity = onchainData.liquidity;
   return {
     ethAmount: liquidity.formatted || "0",
-    usdValue: liquidity.usdcDecimal || 0,
     raw: liquidity.raw || "0",
     hasLiquidity: parseFloat(liquidity.formatted || "0") > 0
   };
@@ -228,7 +181,6 @@ export const getMarketCapInfo = (onchainData) => {
   const marketCap = onchainData.marketCap;
   return {
     ethAmount: marketCap.formatted || "0",
-    usdValue: marketCap.usdcDecimal || 0,
     raw: marketCap.raw || "0",
     hasValue: parseFloat(marketCap.formatted || "0") > 0
   };
@@ -243,7 +195,6 @@ export const getTokenPrice = (onchainData) => {
   if (!onchainData?.marketCap || !onchainData?.totalSupply) {
     return {
       ethPrice: "0",
-      usdPrice: 0,
       hasPrice: false
     };
   }
@@ -251,23 +202,19 @@ export const getTokenPrice = (onchainData) => {
   try {
     const marketCapEth = parseFloat(onchainData.marketCap.formatted || "0");
     const totalSupply = parseFloat(onchainData.totalSupply.formatted || "0");
-    const marketCapUsd = onchainData.marketCap.usdcDecimal || 0;
     
-    if (totalSupply === 0) return { ethPrice: "0", usdPrice: 0, hasPrice: false };
+    if (totalSupply === 0) return { ethPrice: "0", hasPrice: false };
     
     const ethPrice = marketCapEth / totalSupply;
-    const usdPrice = marketCapUsd / totalSupply;
     
     return {
       ethPrice: ethPrice.toFixed(8),
-      usdPrice: usdPrice.toFixed(6),
-      hasPrice: ethPrice > 0 || usdPrice > 0
+      hasPrice: ethPrice > 0
     };
   } catch (error) {
     console.error("Error calculating token price:", error);
     return {
       ethPrice: "0",
-      usdPrice: 0,
       hasPrice: false
     };
   }

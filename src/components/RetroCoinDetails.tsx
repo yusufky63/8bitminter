@@ -3,6 +3,9 @@ import Image from "next/image";
 import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { toast } from "react-hot-toast";
 import { getCoinDetails, fetchCoinComments } from "../services/sdk/getCoins.js";
+import { resolveImageUrl } from "../utils/ipfs";
+import { SafeImage } from "./ui/SafeImage";
+import { Camera } from "lucide-react";
 import {
   validateTradeBalance,
   checkETHBalance,
@@ -1283,37 +1286,15 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
           {/* Token header section with enhanced styling */}
           <div className="mb-4 bg-gradient-to-b from-retro-primary/10 to-transparent p-3  border-2 border-retro-primary shadow-[0_0_12px_rgba(255,107,53,0.15)]">
             <div className="flex items-start gap-3">
-              {tokenDetails.imageUri ? (
-                <Image
-                  src={tokenDetails.imageUri}
-                  alt={tokenDetails.name}
-                  width={64}
-                  height={64}
-                  className="w-16 h-16 rounded-md pixelated border-2 border-retro-primary object-cover"
-                  unoptimized
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.onerror = null;
-                    target.style.display = "none";
-                    const parent = target.parentNode;
-                    if (parent) {
-                      const svgPlaceholder = document.createElement("div");
-                      svgPlaceholder.className =
-                        "w-16 h-16 bg-retro-primary/5 flex items-center justify-center rounded-md border-2 border-retro-primary";
-                      svgPlaceholder.innerHTML = `<span class="text-retro-primary text-2xl font-bold pixelated">${tokenDetails.symbol.charAt(
-                        0
-                      )}</span>`;
-                      parent.appendChild(svgPlaceholder);
-                    }
-                  }}
-                />
-              ) : (
-                <div className="w-16 h-16 bg-retro-primary/5 flex items-center justify-center rounded-md border-2 border-retro-primary">
-                  <span className="text-retro-primary text-2xl font-bold pixelated">
-                    {tokenDetails.symbol.charAt(0)}
-                  </span>
-                </div>
-              )}
+              <SafeImage
+                src={tokenDetails.imageUri || ''}
+                alt={tokenDetails.name}
+                width={64}
+                height={64}
+                className="w-16 h-16 rounded-md border-2 border-retro-primary"
+                fallbackIcon={<Camera size={24} />}
+                fallbackText=""
+              />
 
               <div className="flex-1">
                 <div className="flex justify-between items-start">

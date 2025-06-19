@@ -16,7 +16,8 @@ import { RetroNotification } from "./RetroNotification";
 // Services
 import { getCoinCategories } from "../services/aiService.js";
 import { processTtlgenHerImage } from "../services/imageUtils";
-import { createZoraCoin } from "../services/sdk/getCreateCoin.js";
+import { createZoraCoin, getCoinAddressFromReceipt, DeployCurrency } from "../services/sdk/getCreateCoin.js";
+import { CoinService, type CreateCoinData } from "../services/coinService";
 
 // Type definitions
 // Type definitions
@@ -77,13 +78,17 @@ interface FarcasterSDK {
 
 interface CoinCreationResult {
   hash: string;
-  address: string;
+  address?: string;
   receipt?: {
     blockHash?: string;
     blockNumber?: bigint;
     contractAddress?: string;
     status?: string;
     transactionHash?: string;
+    logs?: unknown[];
+    [key: string]: unknown;
+  };
+  deployment?: {
     [key: string]: unknown;
   };
 }
@@ -118,6 +123,8 @@ export default function RetroCoinCreator() {
   const [isPurchaseEnabled, setIsPurchaseEnabled] = useState<boolean>(true);
   const [ownersAddresses, setOwnersAddresses] = useState<string[]>([]);
   const [newOwnerAddress, setNewOwnerAddress] = useState<string>("");
+  const [selectedCurrency, setSelectedCurrency] = useState<number>(DeployCurrency.ETH);
+  const [platformReferrer, setPlatformReferrer] = useState<string>("");
   
   // AI generations
   const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
@@ -633,17 +640,22 @@ export default function RetroCoinCreator() {
         duration: 10000
       });
       
-      // Create Zora coin using SDK with the IPFS URI
+      // Create Zora coin using updated SDK with the IPFS URI
       console.log("Creating coin with URI:", formData.imageUrl);
+      console.log("Using currency:", selectedCurrency === DeployCurrency.ZORA ? "ZORA" : "ETH");
       
         const result = await createZoraCoin({
           name: formData.name,
           symbol: formData.symbol,
           uri: formData.imageUrl,
           payoutRecipient: walletAddress,
-          initialPurchaseWei: isPurchaseEnabled ? parseEther(selectedPurchaseAmount) : BigInt(0),
-          owners: ownersAddresses.length > 0 ? ownersAddresses : undefined
-        }, walletClient, publicClient, { gasMultiplier: 100 }) as CoinCreationResult;
+          currency: selectedCurrency, // Use selected currency (ZORA or ETH)
+          chainId: chainId, // Include current chain ID
+          platformReferrer: platformReferrer || undefined, // Optional platform referrer
+          owners: ownersAddresses.length > 0 ? ownersAddresses : undefined,
+          // Use initial purchase as specified by user
+          initialPurchaseWei: isPurchaseEnabled ? parseEther(selectedPurchaseAmount) : BigInt(0)
+        }, walletClient, publicClient) as CoinCreationResult;
         
         console.log("Token created successfully:", result);
         
@@ -652,13 +664,55 @@ export default function RetroCoinCreator() {
           id: 'status-toast'
         });
         
-        // Set the contract address from the actual transaction - ensure property exists
-        if (result && typeof result === 'object' && 'address' in result) {
-          setContractAddress(result.address);
+        // Set the contract address from the result or extract from receipt
+        let contractAddress = "";
+        if (result && typeof result === 'object' && 'address' in result && result.address) {
+          contractAddress = result.address;
+        } else if (result && result.receipt) {
+          // Try to extract address from transaction receipt logs using new helper
+          const extractedAddress = getCoinAddressFromReceipt(result.receipt);
+          contractAddress = extractedAddress || "Contract created, address unknown";
         } else {
           console.warn("Contract address not found in result:", result);
-          // Fallback if address is missing but transaction was successful
-          setContractAddress("Contract created, address unknown");
+          contractAddress = "Contract created, address unknown";
+        }
+        
+        setContractAddress(contractAddress);
+        
+        // Save coin to database after successful creation
+        if (contractAddress && contractAddress !== "Contract created, address unknown") {
+          try {
+            toast.loading("Saving coin to database...", { id: 'save-toast' });
+            
+            const coinData: CreateCoinData = {
+              name: formData.name,
+              symbol: formData.symbol,
+              description: formData.description,
+              contract_address: contractAddress,
+              image_url: formData.imageUrl,
+              category: formData.category,
+              creator_address: walletAddress,
+              creator_name: walletAddress, // You can enhance this with actual user names later
+              tx_hash: result.hash,
+              chain_id: chainId,
+              currency: 'ETH', // Default to ETH for now
+              platform_referrer: platformReferrer || undefined,
+            };
+            
+            const savedCoin = await CoinService.saveCoin(coinData);
+            
+            if (savedCoin) {
+              toast.success("🎉 Coin saved to database successfully!", { id: 'save-toast' });
+              console.log("✅ Coin successfully saved to database:", savedCoin);
+            } else {
+              toast.error("Failed to save coin to database", { id: 'save-toast' });
+              console.error("❌ Failed to save coin to database");
+            }
+          } catch (error) {
+            console.error("❌ Error saving coin to database:", error);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            toast.error(`Database error: ${errorMessage}`, { id: 'save-toast' });
+          }
         }
         
         // Set success message
@@ -757,6 +811,8 @@ export default function RetroCoinCreator() {
     setIsCustomAmount(false);
     setIsPurchaseEnabled(true);
     setOwnersAddresses([]);
+    setSelectedCurrency(DeployCurrency.ETH); // Reset to default ETH currency
+    setPlatformReferrer(""); // Reset platform referrer
   };
 
   // Initialize SDK and set up application
@@ -766,6 +822,17 @@ export default function RetroCoinCreator() {
     
     // Set content ready flag when initial data is loaded
     setIsContentReady(true);
+    
+    // Set default currency based on chain when wallet connects
+    if (isConnected && walletClient) {
+      walletClient.getChainId().then(chainId => {
+        // Default to ETH on other chains  
+        const defaultCurrency = chainId === base.id ? DeployCurrency.ETH : DeployCurrency.ETH;
+        setSelectedCurrency(defaultCurrency);
+      }).catch(error => {
+        console.error("Error getting chain ID:", error);
+      });
+    }
     
     // Define async function to initialize SDK
     const initFarcasterSDK = async () => {
@@ -825,7 +892,7 @@ export default function RetroCoinCreator() {
     if (isContentReady) {
       initFarcasterSDK();
     }
-  }, [isContentReady]);
+  }, [isContentReady, isConnected, walletClient]);
   
   // Steps for progress indicator
   const steps = [
@@ -850,6 +917,12 @@ export default function RetroCoinCreator() {
 
   const updateSymbol = (symbol: string) => {
     setFormData({ ...formData, symbol });
+  };
+
+  // Currency change handler
+  const handleCurrencyChange = (currency: number) => {
+    setSelectedCurrency(currency);
+    console.log(`Currency changed to: ${currency === DeployCurrency.ZORA ? 'ZORA' : 'ETH'}`);
   };
 
   return (
@@ -881,9 +954,11 @@ export default function RetroCoinCreator() {
         <RetroTokenDetails
           name={formData.name}
           symbol={formData.symbol}
+          description={formData.description}
           aiSuggestion={aiSuggestion}
           onNameChange={updateName}
           onSymbolChange={updateSymbol}
+          onDescriptionChange={updateDescription}
           onNext={generateTokenImage}
           onBack={() => setStep(1)}
           isLoading={creatingImage}
@@ -906,6 +981,7 @@ export default function RetroCoinCreator() {
           newOwnerAddress={newOwnerAddress}
           isConnected={isConnected}
           isLoading={isLoading}
+          selectedCurrency={selectedCurrency}
           onPurchaseToggle={() => setIsPurchaseEnabled(!isPurchaseEnabled)}
           onPercentageChange={setPredefinedAmount}
           onCustomAmountChange={handleCustomAmountChange}
@@ -915,6 +991,7 @@ export default function RetroCoinCreator() {
           onConnect={connectWallet}
           onCreateCoin={handleCreateCoin}
           onBack={() => setStep(2)}
+          onCurrencyChange={handleCurrencyChange}
         />
       )}
       

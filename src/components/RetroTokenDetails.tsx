@@ -4,10 +4,12 @@ import { RetroStepScreen } from "./RetroStepScreen";
 import { RetroDivider } from "./RetroDivider";
 import { RetroButton } from "./ui/RetroButton";
 import { toast } from "react-hot-toast";
+import { Info, ArrowLeft, Camera, Zap } from "lucide-react";
 
 interface RetroTokenDetailsProps {
   name: string;
   symbol: string;
+  description: string;
   aiSuggestion: {
     name: string;
     symbol: string;
@@ -15,6 +17,7 @@ interface RetroTokenDetailsProps {
   } | null;
   onNameChange: (name: string) => void;
   onSymbolChange: (symbol: string) => void;
+  onDescriptionChange: (description: string) => void;
   onNext: () => void;
   onBack: () => void;
   isLoading: boolean;
@@ -23,14 +26,16 @@ interface RetroTokenDetailsProps {
 export function RetroTokenDetails({
   name,
   symbol,
+  description,
   aiSuggestion,
   onNameChange,
   onSymbolChange,
+  onDescriptionChange,
   onNext,
   onBack,
   isLoading
 }: RetroTokenDetailsProps) {
-  const isNextDisabled = !name || !symbol;
+  const isNextDisabled = !name || !symbol || !description;
   
   // Direct image generation handler
   const handleGenerateImage = async () => {
@@ -105,19 +110,7 @@ export function RetroTokenDetails({
         hideButtons={true}
         className="mb-4 overflow-hidden"
       >
-        {aiSuggestion && (
-          <div className="mb-4 p-1 border-2 border-retro-primary bg-gradient-to-r from-retro-darker  transform transition-all duration-300 hover:shadow-[0_0_15px_rgba(255,107,53,0.3)] hover:scale-[1.01]">
-            <h3 className="text-retro-secondary text-sm font-bold mb-1 flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                <line x1="12" y1="22.08" x2="12" y2="12"></line>
-              </svg>
-              AI Suggestion
-            </h3>
-            <div className="text-retro-accent text-sm leading-relaxed  p-1 rounded-md">{aiSuggestion.description}</div>
-          </div>
-        )}
+
         
         <RetroDivider text="Token Information" />
         
@@ -144,19 +137,29 @@ export function RetroTokenDetails({
             />
             <p className="text-xs text-retro-secondary mt-1 ml-1 italic">Short identifier for exchanges (3-4 characters)</p>
           </div>
+          
+                      <div className="transform transition-all duration-300 hover:translate-x-1">
+              <label className="block text-retro-secondary text-sm font-medium mb-2">
+                Token Description
+              </label>
+              <textarea
+                value={description}
+                onChange={e => onDescriptionChange(e.target.value)}
+                placeholder="Describe your token's purpose and features"
+                rows={3}
+                className="w-full px-3 py-2 bg-retro-darker border-2 border-retro-primary text-white placeholder-retro-secondary/50 transition-colors duration-300 resize-none focus:outline-none focus:border-retro-accent focus:bg-retro-darker"
+              />
+              <p className="text-xs text-retro-secondary mt-1 ml-1 italic">Brief description for your token (will be included in metadata)</p>
+            </div>
         </div>
         
         <div className="text-xs text-retro-accent mt-5 p-3 rounded-none border-2 border-retro-primary">
           <div className="flex items-center mb-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 text-retro-primary">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="8" x2="12" y2="12"></line>
-              <line x1="12" y1="16" x2="12.01" y2="16"></line>
-            </svg>
+            <Info size={16} className="mr-2 text-retro-primary" />
             <p className="font-semibold">Helpful Tips:</p>
           </div>
-          <p className="ml-6 mb-1">• AI has suggested a name and symbol</p>
-          <p className="ml-6">• You can modify these or keep the suggestions</p>
+          <p className="ml-6 mb-1">• AI has suggested name, symbol and description</p>
+          <p className="ml-6">• You can modify these fields or keep the suggestions</p>
         </div>
       </RetroStepScreen>
       
@@ -169,10 +172,7 @@ export function RetroTokenDetails({
           className="transition-all duration-300 hover:bg-retro-primary/10"
         >
           <span className="flex items-center justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-              <path d="M19 12H5"></path>
-              <path d="M12 19l-7-7 7-7"></path>
-            </svg>
+            <ArrowLeft size={16} className="mr-2" />
             Back
           </span>
         </RetroButton>
@@ -186,10 +186,7 @@ export function RetroTokenDetails({
         >
           <span className="flex items-center justify-center">
             Generate Image
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-2">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-              <circle cx="12" cy="13" r="4"></circle>
-            </svg>
+            <Camera size={16} className="ml-2" />
           </span>
         </RetroButton>
       </div>
@@ -197,9 +194,7 @@ export function RetroTokenDetails({
       {/* Instruction text */}
       <div className="mt-6 p-4 bg-gradient-to-r from-retro-primary/20 to-retro-primary/5 rounded-sm border border-retro-primary transition-all duration-300 hover:shadow-[0_0_10px_rgba(255,107,53,0.2)]">
         <p className="text-retro-accent text-sm text-center flex items-center justify-center">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 text-retro-primary">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-          </svg>
+          <Zap size={18} className="mr-2 text-retro-primary" />
           Click the Generate Image button to create your token artwork
         </p>
       </div>

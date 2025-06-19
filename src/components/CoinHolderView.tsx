@@ -6,6 +6,8 @@ import { getProfileBalance, getZoraProfile } from "../services/sdk/getProfiles.j
 import { validateTradeBalance } from "../services/sdk/getTradeCoin.js";
 import { toast } from "react-hot-toast";
 import CoinDetails from "./RetroCoinDetails";
+import { resolveImageUrl } from "../utils/ipfs";
+import { Camera } from "lucide-react";
 
 interface TokenBalance {
   address: string;
@@ -89,18 +91,19 @@ interface ProfileBalanceResponse {
 // TokenImage component to handle fallback cleanly
 const TokenImage = ({ imageUrl, symbol, name }: { imageUrl?: string; symbol: string; name: string }) => {
   const [imageError, setImageError] = useState(false);
+  const resolvedUrl = imageUrl ? resolveImageUrl(imageUrl) : '';
 
-  if (!imageUrl || imageError) {
+  if (!resolvedUrl || imageError) {
     return (
       <div className="w-10 h-10 bg-retro-primary/10 border border-retro-primary/50 flex items-center justify-center rounded">
-        <span className="text-retro-primary text-sm font-bold pixelated">{symbol.charAt(0)}</span>
+        <Camera size={16} className="text-retro-primary" />
       </div>
     );
   }
 
   return (
     <Image 
-      src={imageUrl} 
+      src={resolvedUrl} 
       alt={name} 
       width={40}
       height={40}
@@ -631,9 +634,9 @@ export default function CoinHolderView() {
             ) : userProfile ? (
               <div className="bg-gradient-to-br from-retro-primary/10 via-retro-primary/5 to-black/40 p-4 border-2 border-retro-primary shadow-[0_0_15px_rgba(255,107,53,0.2)]">
                 <div className="flex items-center gap-4">
-                  {userProfile.avatar ? (
+                  {userProfile.avatar && resolveImageUrl(userProfile.avatar) ? (
                     <Image 
-                      src={userProfile.avatar}
+                      src={resolveImageUrl(userProfile.avatar)}
                       alt={userProfile.displayName || "Profile"} 
                       width={56}
                       height={56}
@@ -641,8 +644,11 @@ export default function CoinHolderView() {
                       unoptimized
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
-                        target.onerror = null;
-                        target.src = "https://i.imgur.com/HeIi0wU.png";
+                        target.style.display = 'none';
+                        const parent = target.parentNode as HTMLElement;
+                        if (parent) {
+                          parent.innerHTML = '<div class="w-14 h-14 rounded-lg bg-retro-primary/20 border-2 border-retro-primary flex items-center justify-center shadow-[0_0_8px_rgba(255,107,53,0.3)]"><span class="text-retro-primary text-xl font-bold pixelated">📷</span></div>';
+                        }
                       }}
                     />
                   ) : (
@@ -671,7 +677,6 @@ export default function CoinHolderView() {
                     
                     <div className="grid grid-cols-1 gap-1">
                       <div className="flex items-center gap-2 text-xs">
-                        <span className="text-retro-secondary pixelated">WALLET:</span>
                         <span className="text-retro-accent font-mono bg-black/30 px-2 py-1 border border-retro-primary/30 rounded">
                           {address ? `${address.substring(0, 8)}...${address.substring(address.length - 6)}` : 'N/A'}
                         </span>

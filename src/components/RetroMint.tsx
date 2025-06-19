@@ -3,6 +3,7 @@ import Image from "next/image";
 import { RetroStepScreen } from "./RetroStepScreen";
 import { RetroDivider } from "./RetroDivider";
 import { RetroButton } from "./ui/RetroButton";
+import { resolveImageUrl } from "../utils/ipfs";
 
 interface RetroMintProps {
   name: string;
@@ -19,6 +20,7 @@ interface RetroMintProps {
   newOwnerAddress: string;
   isConnected: boolean;
   isLoading: boolean;
+  selectedCurrency: number;
   onPurchaseToggle: () => void;
   onPercentageChange: (percentage: number) => void;
   onCustomAmountChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -28,6 +30,7 @@ interface RetroMintProps {
   onConnect: () => void;
   onCreateCoin: () => void;
   onBack: () => void;
+  onCurrencyChange: (currency: number) => void;
 }
 
 export function RetroMint({
@@ -44,6 +47,7 @@ export function RetroMint({
   newOwnerAddress,
   isConnected,
   isLoading,
+  selectedCurrency,
   onPurchaseToggle,
   onPercentageChange,
   onCustomAmountChange,
@@ -52,7 +56,8 @@ export function RetroMint({
   onRemoveOwner,
   onConnect,
   onCreateCoin,
-  onBack
+  onBack,
+  onCurrencyChange
 }: RetroMintProps) {
   const isDisabled = !isConnected;
   const [useCustomAmount, setUseCustomAmount] = useState(false);
@@ -92,17 +97,32 @@ export function RetroMint({
         <RetroDivider text="TOKEN PREVIEW" />
         
         <div className="flex items-center mb-4">
-          {displayImageUrl && (
             <div className="w-24 h-24 border-2 border-retro-primary mr-4">
+            {displayImageUrl && resolveImageUrl(displayImageUrl) ? (
               <Image
-                src={displayImageUrl}
+                src={resolveImageUrl(displayImageUrl)}
                 alt="Token"
                 width={96}
                 height={96}
                 className="w-full h-full object-cover pixelated"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const parent = target.parentNode as HTMLElement;
+                  if (parent) {
+                    parent.innerHTML = '<div class="w-full h-full bg-retro-darker/50 flex items-center justify-center"><div class="text-center"><div class="text-retro-primary text-lg mb-1">📷</div><div class="text-retro-secondary text-xs">NO IMAGE</div></div></div>';
+                  }
+                }}
               />
+            ) : (
+              <div className="w-full h-full bg-retro-darker/50 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="text-retro-primary text-lg mb-1">📷</div>
+                  <div className="text-retro-secondary text-xs">NO IMAGE</div>
+                </div>
             </div>
           )}
+          </div>
           
           <div className="flex-1">
             <div className="grid grid-cols-2 gap-1 text-sm font-mono">
@@ -120,6 +140,36 @@ export function RetroMint({
 
         {/* Add description section */}
      
+        
+        <RetroDivider text="CURRENCY SELECTION" />
+        
+        <div className="mb-4">
+          <label className="retro-label mb-2">SELECT TRADING CURRENCY</label>
+          <div className="grid grid-cols-2 gap-2">
+            <RetroButton
+              onClick={() => onCurrencyChange(2)} // ETH
+              className={`text-sm ${selectedCurrency === 2 ? 'bg-retro-primary text-retro-dark' : 'bg-transparent border border-retro-primary text-retro-accent'}`}
+            >
+              ETH/WETH
+            </RetroButton>
+            
+            <RetroButton
+              onClick={() => onCurrencyChange(1)} // ZORA
+                              className={`text-sm ${selectedCurrency === 1 ? 'bg-retro-primary text-retro-dark' : 'bg-transparent border border-retro-primary text-retro-accent'}`}
+            >
+              ZORA TOKEN
+            </RetroButton>
+          </div>
+          
+          <div className="text-xs text-retro-secondary mt-2 p-2 border border-retro-primary/30">
+            <p className="mb-1">
+              <span className="text-retro-primary">ETH/WETH:</span> Most common, uses Ethereum as trading currency
+            </p>
+            <p>
+              <span className="text-retro-primary">ZORA TOKEN:</span> Uses ZORA tokens for trading
+            </p>
+          </div>
+        </div>
         
         <RetroDivider text="PURCHASE SETTINGS" />
         
