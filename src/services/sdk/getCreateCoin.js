@@ -3,9 +3,14 @@
  * @module createCoin
  */
 
-import { createCoin, validateMetadataURIContent, getCoinCreateFromLogs, DeployCurrency } from "@zoralabs/coins-sdk";
-import { base } from 'viem/chains';
-import { toast } from 'react-hot-toast';
+import {
+  createCoin,
+  validateMetadataURIContent,
+  getCoinCreateFromLogs,
+  DeployCurrency,
+} from "@zoralabs/coins-sdk";
+import { base } from "viem/chains";
+import { toast } from "react-hot-toast";
 
 /**
  * Creates a Zora coin using the updated SDK's createCoin function
@@ -23,22 +28,28 @@ import { toast } from 'react-hot-toast';
  * @param {Object} publicClient - Viem public client
  * @returns {Promise<object>} Transaction result with hash, receipt, and coin address
  */
-export async function createZoraCoin({
-  name,
-  symbol,
-  uri,
-  payoutRecipient,
-  owners = [],
-  initialPurchaseWei = 0n,
-  platformReferrer,
-  currency,
-  chainId
-}, walletClient, publicClient) {
+export async function createZoraCoin(
+  {
+    name,
+    symbol,
+    uri,
+    payoutRecipient,
+    owners = [],
+    initialPurchaseWei = 0n,
+    platformReferrer,
+    currency,
+    chainId,
+  },
+  walletClient,
+  publicClient
+) {
   try {
     if (!name || !symbol || !uri || !payoutRecipient) {
-      throw new Error("Required parameters missing: name, symbol, uri, and payoutRecipient are required");
+      throw new Error(
+        "Required parameters missing: name, symbol, uri, and payoutRecipient are required"
+      );
     }
-    
+
     if (!walletClient || !publicClient) {
       throw new Error("Wallet client and public client are required");
     }
@@ -56,15 +67,20 @@ export async function createZoraCoin({
     // Get wallet chain ID or use provided chainId
     const walletChainId = await walletClient.getChainId();
     const targetChainId = chainId || walletChainId;
-    
+
     // Validate Base network (optional - remove if you want to support other chains)
     if (targetChainId === base.id && walletChainId !== base.id) {
-      toast.error(`You're connected to network ID ${walletChainId}, but Base network (${base.id}) is required. Please switch networks.`, { 
-        id: "network-error", 
-        duration: 5000 
-      });
-      
-      throw new Error(`Chain mismatch: Connected to chain ${walletChainId}, but Base (${base.id}) is required. Please switch networks.`);
+      toast.error(
+        `You're connected to network ID ${walletChainId}, but Base network (${base.id}) is required. Please switch networks.`,
+        {
+          id: "network-error",
+          duration: 5000,
+        }
+      );
+
+      throw new Error(
+        `Chain mismatch: Connected to chain ${walletChainId}, but Base (${base.id}) is required. Please switch networks.`
+      );
     }
 
     // Determine currency - use DeployCurrency enum from SDK
@@ -77,66 +93,69 @@ export async function createZoraCoin({
         selectedCurrency = DeployCurrency.ETH; // ETH is default on other chains
       }
     }
-    
-    console.log("Selected currency:", selectedCurrency === DeployCurrency.ZORA ? "ZORA" : "ETH");
-    
+
+    console.log(
+      "Selected currency:",
+      selectedCurrency === DeployCurrency.ZORA ? "ZORA" : "ETH"
+    );
+
     // Prepare coin parameters according to latest SDK docs format
     const coinParams = {
-        name,
-        symbol,
-        uri,
-        payoutRecipient,
+      name,
+      symbol,
+      uri,
+      payoutRecipient,
       currency: selectedCurrency, // Use DeployCurrency enum from SDK
       ...(owners && owners.length > 0 && { owners }), // Only include owners if provided
-      ...(platformReferrer && { platformReferrer }) // Only include platformReferrer if provided
+      ...(platformReferrer && { platformReferrer }), // Only include platformReferrer if provided
     };
-    
+
     // Include chainId only if it's different from the current wallet chain
     if (chainId && chainId !== walletChainId) {
       coinParams.chainId = chainId;
     }
-    
+
     console.log("Creating coin with SDK parameters:", {
       ...coinParams,
       currencyType: selectedCurrency === DeployCurrency.ZORA ? "ZORA" : "ETH",
-      initialPurchaseWei: initialPurchaseWei.toString()
+      initialPurchaseWei: initialPurchaseWei.toString(),
     });
 
     // Use the SDK's createCoin function with proper options
-    const result = await createCoin(
-      coinParams,
-      walletClient,
-      publicClient,
-      {
-        gasMultiplier: 120, // Add 20% buffer to gas (recommended)
-        // For ETH currency with initial purchase, SDK should handle value automatically
-      }
-    );
+    const result = await createCoin(coinParams, walletClient, publicClient, {
+      gasMultiplier: 120, // Add 20% buffer to gas (recommended)
+      // For ETH currency with initial purchase, SDK should handle value automatically
+    });
 
     console.log("Coin created successfully with SDK:", {
       hash: result.hash,
       address: result.address,
-      deployment: result.deployment
+      deployment: result.deployment,
     });
 
     return result;
   } catch (error) {
     console.error("Error creating coin:", error);
-    
+
     // Provide more specific error messages
     if (error.message && error.message.includes("execution reverted")) {
-      throw new Error("Contract execution failed. This might be due to insufficient funds, invalid parameters, or network congestion. Please try again with a higher gas limit or check your wallet balance.");
+      throw new Error(
+        "Contract execution failed. This might be due to insufficient funds, invalid parameters, or network congestion. Please try again with a higher gas limit or check your wallet balance."
+      );
     } else if (error.message && error.message.includes("user rejected")) {
       throw new Error("Transaction was rejected by user");
     } else if (error.message && error.message.includes("insufficient funds")) {
       throw new Error("Insufficient funds for transaction including gas fees");
-    } else if (error.message && error.message.includes("Invalid metadata URI")) {
+    } else if (
+      error.message &&
+      error.message.includes("Invalid metadata URI")
+    ) {
       throw new Error(`Metadata validation failed: ${error.message}`);
     } else {
       throw new Error(`Failed to create coin: ${error.message}`);
     }
   }
-} 
+}
 
 /**
  * Helper function to get coin address from transaction receipt logs
@@ -154,4 +173,4 @@ export function getCoinAddressFromReceipt(receipt) {
 }
 
 // Export the DeployCurrency enum from the SDK for consistency
-export { DeployCurrency }; 
+export { DeployCurrency };

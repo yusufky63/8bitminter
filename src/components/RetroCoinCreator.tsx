@@ -3,6 +3,8 @@ import { useAccount, useConnect, useWalletClient, usePublicClient } from "wagmi"
 import { toast } from "react-hot-toast";
 import { parseEther } from "viem";
 import { base } from "viem/chains";
+import { detectEnvironment, getPreferredConnectorId, isWalletAvailable, getWalletAvailabilityMessage } from '../utils/wallet';
+import { runWalletDiagnostics, testWalletConnections } from '../utils/walletTest';
 
 // Retro components
 import { RetroSteps } from "./ui/RetroSteps";
@@ -139,6 +141,22 @@ export default function RetroCoinCreator() {
   const { connect, connectors } = useConnect();
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
+
+  // Debug environment and connectors
+  useEffect(() => {
+    const environment = detectEnvironment();
+    console.log('Current environment:', environment);
+    console.log('Available connectors:', connectors?.map(c => ({ id: c.id, name: c.name })));
+    console.log('Wallet available:', isWalletAvailable());
+    
+    // Run full diagnostics
+    runWalletDiagnostics();
+    
+    // Test wallet connections in development
+    if (process.env.NODE_ENV === 'development') {
+      testWalletConnections();
+    }
+  }, [connectors]);
 
   // Get ETH price in USD
   const fetchEthPrice = useCallback(async () => {
@@ -585,7 +603,14 @@ export default function RetroCoinCreator() {
 
     // Check wallet client - using hooks from component level
     if (!walletClient || !publicClient) {
-      setError("Wallet client is not available. Please reconnect your wallet.");
+      setError("Wallet client is not available. Please connect your wallet first.");
+      setIsLoading(false);
+      return;
+    }
+
+    // Additional check for wallet connection
+    if (!isConnected || !address) {
+      setError("Please connect your wallet first.");
       setIsLoading(false);
       return;
     }
@@ -751,9 +776,17 @@ export default function RetroCoinCreator() {
     try {
       setError("");
       
+      // Check if wallet is available in current environment
+      if (!isWalletAvailable()) {
+        const environment = detectEnvironment();
+        const message = getWalletAvailabilityMessage(environment);
+        setError(message);
+        return;
+      }
+      
       if (!connectors || connectors.length === 0) {
-        console.error("No connectors available - Farcaster connector not properly initialized");
-        setError("Wallet connection is not available. Please ensure you're using Warpcast app.");
+        console.error("No connectors available");
+        setError("Wallet connection is not available. Please ensure you're using a supported app.");
         return;
       }
       
@@ -766,13 +799,30 @@ export default function RetroCoinCreator() {
         return;
       }
       
-      console.log("Connecting with Farcaster connector...");
+      // Detect environment and use appropriate connector
+      const environment = detectEnvironment();
+      const preferredConnectorId = getPreferredConnectorId(environment);
       
-      // Simple connection using official documentation
-      await connect({ connector: connectors[0] });
+      console.log(`Environment: ${environment}, Preferred connector: ${preferredConnectorId}`);
       
-      // The connection process is asynchronous, so we can't check the result directly here.
-      // The useAccount hook will automatically update isConnected and address values.
+      // Find the best connector for the environment
+      let targetConnector = connectors[0]; // Default fallback
+      
+      const preferredConnector = connectors.find(connector => 
+        connector.id === preferredConnectorId || 
+        connector.id.includes(preferredConnectorId) ||
+        (preferredConnectorId === 'injected' && connector.name?.toLowerCase().includes('injected'))
+      );
+      
+      if (preferredConnector) {
+        targetConnector = preferredConnector;
+        console.log(`Using ${preferredConnector.name} connector for ${environment}`);
+      } else {
+        console.log(`Preferred connector ${preferredConnectorId} not found, using default`);
+      }
+      
+      await connect({ connector: targetConnector });
+      
       toast.success("Wallet connection initiated.", {
         id: 'status-toast'
       });
@@ -780,7 +830,40 @@ export default function RetroCoinCreator() {
     } catch (error) {
       console.error("Error connecting wallet:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      setError(`Failed to connect wallet: ${errorMessage}. Please try again.`);
+      const environment = detectEnvironment();
+      
+      // Enhanced error messages based on environment and error type
+      let userMessage = "";
+      
+      if (errorMessage.includes("rejected") || errorMessage.includes("denied")) {
+        userMessage = "Wallet connection was rejected. Please try again and approve the connection.";
+      } else if (errorMessage.includes("not found") || errorMessage.includes("No connector")) {
+        switch (environment) {
+          case 'baseapp':
+            userMessage = "BaseApp wallet not available. Please ensure you're using the latest version of BaseApp.";
+            break;
+          case 'farcaster':
+            userMessage = "Farcaster wallet not available. Please ensure you're using Warpcast app.";
+            break;
+          case 'browser':
+            userMessage = "No wallet found. Please install MetaMask or another Ethereum wallet.";
+            break;
+          default:
+            userMessage = "Wallet not available in this environment. Please use BaseApp, Warpcast, or a browser with wallet extension.";
+        }
+      } else if (errorMessage.includes("network") || errorMessage.includes("RPC")) {
+        userMessage = "Network connection error. Please check your internet connection and try again.";
+      } else if (errorMessage.includes("switch") || errorMessage.includes("chain")) {
+        userMessage = "Please switch to Base network in your wallet and try again.";
+      } else {
+        userMessage = `Connection failed: ${errorMessage}. Please try again or use a different wallet.`;
+      }
+      
+      setError(userMessage);
+      toast.error("Wallet connection failed", {
+        id: 'status-toast',
+        duration: 5000
+      });
     }
   };
 
@@ -935,7 +1018,11 @@ export default function RetroCoinCreator() {
       </div>
       
       {step === 0 && (
-        <RetroIntro onGetStarted={() => setStep(1)} />
+        <RetroIntro 
+          onGetStarted={() => setStep(1)}
+          isWalletConnected={isConnected}
+          onConnectWallet={connectWallet}
+        />
       )}
       
       {step === 1 && (

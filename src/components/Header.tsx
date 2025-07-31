@@ -1,8 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { detectEnvironment, getBaseAppContext, getFarcasterUserContext } from '../utils/wallet';
+
 interface HeaderProps {
   activeTab?: string;
   onTabChange?: (tab: string) => void;
   userName?: string;
+}
+
+interface UserInfo {
+  name?: string;
+  type?: 'basename' | 'farcaster' | 'custom';
+  fid?: number;
 }
 
 export default function RetroHeader({
@@ -11,6 +19,50 @@ export default function RetroHeader({
   userName,
 }: HeaderProps) {
   const [currentTab, setCurrentTab] = useState(activeTab);
+  const [userInfo, setUserInfo] = useState<UserInfo>({});
+
+  // Fetch user info based on environment
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      // If userName prop is provided, use it
+      if (userName) {
+        setUserInfo({ name: userName, type: 'custom' });
+        return;
+      }
+
+      const environment = detectEnvironment();
+      
+      try {
+        if (environment === 'baseapp') {
+          const baseAppContext = await getBaseAppContext();
+          if (baseAppContext?.basename) {
+            setUserInfo({
+              name: baseAppContext.basename,
+              type: 'basename',
+              fid: baseAppContext.fid
+            });
+            return;
+          }
+        }
+
+        if (environment === 'farcaster' || environment === 'baseapp') {
+          const farcasterContext = await getFarcasterUserContext();
+          if (farcasterContext?.username || farcasterContext?.displayName) {
+            setUserInfo({
+              name: farcasterContext.username || farcasterContext.displayName,
+              type: 'farcaster',
+              fid: farcasterContext.fid
+            });
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user info:', error);
+      }
+    };
+
+    fetchUserInfo();
+  }, [userName]);
 
   const handleTabChange = (tab: string) => {
     setCurrentTab(tab);
@@ -34,9 +86,12 @@ export default function RetroHeader({
                 8BitCoiner
               </h1>
             </div>
-            {userName && (
+            {userInfo.name && (
               <div className="text-xs text-retro-accent px-2 py-1 border border-retro-primary rounded">
-                <span className="opacity-70">FC:</span> {userName}
+                <span className="opacity-70">
+                  {userInfo.type === 'basename' ? 'BASE:' : 
+                   userInfo.type === 'farcaster' ? 'FC:' : ''}
+                </span> {userInfo.name}
               </div>
             )}
           </div>

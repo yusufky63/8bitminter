@@ -6,16 +6,22 @@ import { WagmiProvider, createConfig } from "wagmi";
 import { base } from "wagmi/chains";
 import { http } from "wagmi";
 import { farcasterFrame as miniAppConnector } from "@farcaster/frame-wagmi-connector";
+import { injected } from 'wagmi/connectors';
 import { FarcasterProvider } from '../lib/farcaster';
 
-// Create Wagmi configuration for Farcaster mini-apps
+// Create Wagmi configuration for both Farcaster mini-apps and BaseApp
 const config = createConfig({
   chains: [base],
   transports: {
     [base.id]: http(),
   },
   connectors: [
-    miniAppConnector()
+    // Farcaster connector for Warpcast/Farcaster apps
+    miniAppConnector(),
+    // Injected connector for BaseApp and browser wallets
+    injected({
+      target: 'metaMask',
+    }),
   ]
 });
 

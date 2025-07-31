@@ -5,9 +5,11 @@ import { RetroButton } from "./ui/RetroButton";
 
 interface RetroIntroProps {
   onGetStarted: () => void;
+  isWalletConnected?: boolean;
+  onConnectWallet?: () => void;
 }
 
-export function RetroIntro({ onGetStarted }: RetroIntroProps) {
+export function RetroIntro({ onGetStarted, isWalletConnected = false, onConnectWallet }: RetroIntroProps) {
   return (
     <RetroStepScreen
       title="WELCOME TO COIN CREATOR"
@@ -65,17 +67,33 @@ export function RetroIntro({ onGetStarted }: RetroIntroProps) {
         </div>
       </div>
       
-      <RetroButton
-        onClick={onGetStarted}
-        fullWidth
-      >
-        <span className="flex items-center justify-center">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter" className="mr-2">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-          </svg>
-          START MISSION
-        </span>
-      </RetroButton>
+      {!isWalletConnected ? (
+        <RetroButton
+          onClick={onConnectWallet || (() => {})}
+          fullWidth
+        >
+          <span className="flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter" className="mr-2">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+            CONNECT WALLET
+          </span>
+        </RetroButton>
+      ) : (
+        <RetroButton
+          onClick={onGetStarted}
+          fullWidth
+        >
+          <span className="flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter" className="mr-2">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+            START MISSION
+          </span>
+        </RetroButton>
+      )}
     </RetroStepScreen>
   );
 } 
