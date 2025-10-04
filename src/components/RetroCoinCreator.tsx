@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+﻿import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAccount, useConnect, useWalletClient, usePublicClient, useSwitchChain } from "wagmi";
 import { toast } from "react-hot-toast";
 import { parseEther } from "viem";
@@ -125,7 +125,7 @@ export default function RetroCoinCreator() {
   const [isPurchaseEnabled, setIsPurchaseEnabled] = useState<boolean>(true);
   const [ownersAddresses, setOwnersAddresses] = useState<string[]>([]);
   const [newOwnerAddress, setNewOwnerAddress] = useState<string>("");
-  const [selectedCurrency, setSelectedCurrency] = useState<number>(DeployCurrency.ETH);
+  const [selectedCurrency, setSelectedCurrency] = useState<number>(DeployCurrency.ZORA);
   const [platformReferrer, setPlatformReferrer] = useState<string>("0xbFA6A45Dd534d39dF47A3F3D2f2b6E88416f9831");
   
   // AI generations
@@ -259,13 +259,13 @@ export default function RetroCoinCreator() {
 
   // Generate AI suggestions for token name and description
   const generateAiSuggestions = useCallback(async () => {
-    console.log("➡️ generateAiSuggestions called with:", {
+    console.log("â¡ï¸ generateAiSuggestions called with:", {
       category: formData.category,
       description: formData.description
     });
     
     if (!formData.category || !formData.description) {
-      console.warn("❌ Missing category or description");
+      console.warn("âŒ Missing category or description");
       setError("Please select a category and provide a description");
       return;
     }
@@ -279,17 +279,17 @@ export default function RetroCoinCreator() {
     try {
       // Use full URL to avoid relative URL issues
       const apiUrl = `${window.location.origin}/api/ai`;
-      console.log("🔄 Sending request to:", apiUrl);
+      console.log("ğŸ”„ Sending request to:", apiUrl);
       
-      // Timeout controller kaldırıldı - backend ile uyumlu sınırsız bekleme
+      // Timeout controller kaldÄ±rÄ±ldÄ± - backend ile uyumlu sÄ±nÄ±rsÄ±z bekleme
       // const controller = new AbortController();
       // const timeoutId = setTimeout(() => {
       //   controller.abort();
-      //   console.warn("⏱️ Request timeout triggered");
+      //   console.warn("â±ï¸ Request timeout triggered");
       // }, 25000); // Increased timeout
       
       try {
-        console.log("📤 Request payload:", {
+        console.log("ğŸ“¤ Request payload:", {
           action: "text",
           category: formData.category,
           description: formData.description
@@ -309,7 +309,7 @@ export default function RetroCoinCreator() {
         });
         
         // clearTimeout(timeoutId);
-        console.log("📥 Response status:", response.status);
+        console.log("ğŸ“¥ Response status:", response.status);
         
         if (!response.ok) {
           // Detailed error messages
@@ -319,11 +319,11 @@ export default function RetroCoinCreator() {
           try {
             const errorData = await response.json();
             errorMessage = errorData.error || errorMessage;
-            console.error("❌ AI API error:", errorData);
+            console.error("âŒ AI API error:", errorData);
           } catch (_) {
             // JSON parsing failed, use text
             const errorText = await response.text();
-            console.error("❌ AI API error text:", errorText);
+            console.error("âŒ AI API error text:", errorText);
           }
           
           throw new Error(errorMessage);
@@ -333,40 +333,40 @@ export default function RetroCoinCreator() {
         let data;
         try {
           data = await response.json();
-          console.log("✅ AI response data:", data);
+          console.log("âœ… AI response data:", data);
         } catch (parseError) {
-          console.error("❌ Failed to parse JSON response:", parseError);
+          console.error("âŒ Failed to parse JSON response:", parseError);
           throw new Error("Invalid response format from AI service");
         }
         
         if (!data || !data.name || !data.symbol || !data.description) {
-          console.error("❌ Invalid AI response - missing fields:", data);
+          console.error("âŒ Invalid AI response - missing fields:", data);
           throw new Error("Invalid response from AI service - missing required fields");
         }
         
         // Success - update state
-        console.log("✅ Setting AI suggestion:", data);
+        console.log("âœ… Setting AI suggestion:", data);
         setAiSuggestion(data);
         
         // Populate form with AI suggestions
-        console.log("✅ Updating form data with AI suggestions");
+        console.log("âœ… Updating form data with AI suggestions");
         setFormData({
           ...formData,
           name: data.name || formData.name,
           symbol: data.symbol || formData.symbol,
-          description: data.description || formData.description // AI tarafından oluşturulan description'ı formData'ya kaydet
+          description: data.description || formData.description // AI tarafÄ±ndan oluÅŸturulan description'Ä± formData'ya kaydet
         });
         
         // Success toast
         toast.success("Analysis complete! Token details generated", { id: 'status-toast' });
         
         // Move to next step
-        console.log("✅ Moving to next step");
+        console.log("âœ… Moving to next step");
         setStep(2);
       } catch (fetchError: unknown) {
         // clearTimeout(timeoutId);
         
-        console.error("❌ Fetch error:", fetchError);
+        console.error("âŒ Fetch error:", fetchError);
         
         if (fetchError && typeof fetchError === 'object' && 'name' in fetchError && fetchError.name === 'AbortError') {
           toast.error("Request timed out. Please try again.", { id: 'status-toast' });
@@ -384,7 +384,7 @@ export default function RetroCoinCreator() {
         throw fetchError;
       }
     } catch (error) {
-      console.error("❌ Error generating AI suggestions:", error);
+      console.error("âŒ Error generating AI suggestions:", error);
       setError(`Failed to generate AI suggestions: ${error instanceof Error ? error.message : "Unknown error"}`);
       toast.error(`Analysis failed: ${error instanceof Error ? error.message : "Unknown error"}`, { id: 'status-toast' });
     } finally {
@@ -406,11 +406,11 @@ export default function RetroCoinCreator() {
         }
         
         // Update state with AI suggestions
-        console.log("✅ Setting AI suggestion from event:", data);
+        console.log("âœ… Setting AI suggestion from event:", data);
         setAiSuggestion(data);
         
         // Update form data with AI suggestions
-        console.log("✅ Updating form data with AI suggestions from event");
+        console.log("âœ… Updating form data with AI suggestions from event");
         setFormData(prev => ({
           ...prev,
           name: data.name || prev.name,
@@ -418,7 +418,7 @@ export default function RetroCoinCreator() {
         }));
         
         // Move to the next step
-        console.log("✅ Moving to next step from event handler");
+        console.log("âœ… Moving to next step from event handler");
         setStep(2);
       } catch (error) {
         console.error("Error processing AI data from event:", error);
@@ -498,7 +498,7 @@ export default function RetroCoinCreator() {
               symbol: formData.symbol,
               description: imageDescription, // Use AI-enhanced description
             }),
-            // Timeout kaldırıldı - sınırsız bekleme süresi backend ile uyumlu
+            // Timeout kaldÄ±rÄ±ldÄ± - sÄ±nÄ±rsÄ±z bekleme sÃ¼resi backend ile uyumlu
             // signal: AbortSignal.timeout(30000) // 30 second timeout
           });
           
@@ -519,17 +519,17 @@ export default function RetroCoinCreator() {
           
           console.log("Image generation API response:", data);
           
-          // API'den gelen URL'yi doğrudan kullanarak metadata yarat ve IPFS'e yükle
+          // API'den gelen URL'yi doÄŸrudan kullanarak metadata yarat ve IPFS'e yÃ¼kle
           console.log("Processing image URL through IPFS...");
           toast.loading("Uploading to IPFS...", { id: 'status-toast' });
           
           try {
-            // Together.ai URL'sinden metadata yarat ve IPFS'e yükle
+            // Together.ai URL'sinden metadata yarat ve IPFS'e yÃ¼kle
             const processedImage = await processTtlgenHerImage(
               data.imageUrl,
               formData.name,
               formData.symbol,
-              aiSuggestion?.description || formData.description  // AI açıklamasını öncelikle kullan
+              aiSuggestion?.description || formData.description  // AI aÃ§Ä±klamasÄ±nÄ± Ã¶ncelikle kullan
             );
           
             // Update form data with IPFS URI
@@ -563,7 +563,7 @@ export default function RetroCoinCreator() {
           // Show appropriate toast based on attempt status
           if (attempts < maxAttempts) {
             toast.error(`Attempt ${attempts} failed, retrying...`, { id: 'status-toast' });
-            // Wait before retry (rate limit için daha uzun bekleme)
+            // Wait before retry (rate limit iÃ§in daha uzun bekleme)
             const waitTime = error instanceof Error && error.message.includes("Rate limit") ? 5000 : 2000;
             await new Promise(resolve => setTimeout(resolve, waitTime));
           } else {
@@ -751,21 +751,21 @@ export default function RetroCoinCreator() {
               creator_name: walletAddress, // You can enhance this with actual user names later
               tx_hash: result.hash,
               chain_id: chainId,
-              currency: 'ETH', // Default to ETH for now
+              currency: selectedCurrency === DeployCurrency.ZORA ? 'ZORA' : 'ETH',
               platform_referrer: platformReferrer || undefined,
             };
             
             const savedCoin = await CoinService.saveCoin(coinData);
             
             if (savedCoin) {
-              toast.success("🎉 Coin saved to database successfully!", { id: 'save-toast' });
-              console.log("✅ Coin successfully saved to database:", savedCoin);
+              toast.success("ğŸ‰ Coin saved to database successfully!", { id: 'save-toast' });
+              console.log("âœ… Coin successfully saved to database:", savedCoin);
             } else {
               toast.error("Failed to save coin to database", { id: 'save-toast' });
-              console.error("❌ Failed to save coin to database");
+              console.error("âŒ Failed to save coin to database");
             }
           } catch (error) {
-            console.error("❌ Error saving coin to database:", error);
+            console.error("âŒ Error saving coin to database:", error);
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             toast.error(`Database error: ${errorMessage}`, { id: 'save-toast' });
           }
@@ -925,7 +925,7 @@ export default function RetroCoinCreator() {
     setIsCustomAmount(false);
     setIsPurchaseEnabled(true);
     setOwnersAddresses([]);
-    setSelectedCurrency(DeployCurrency.ETH); // Reset to default ETH currency
+    setSelectedCurrency(DeployCurrency.ZORA); // Reset to SDK default on Base
     setPlatformReferrer(""); // Reset platform referrer
   };
 
@@ -941,7 +941,7 @@ export default function RetroCoinCreator() {
     if (isConnected && walletClient) {
       walletClient.getChainId().then(chainId => {
         // Default to ETH on other chains  
-        const defaultCurrency = chainId === base.id ? DeployCurrency.ETH : DeployCurrency.ETH;
+        const defaultCurrency = chainId === base.id ? DeployCurrency.ZORA : DeployCurrency.ETH;
         setSelectedCurrency(defaultCurrency);
       }).catch(error => {
         console.error("Error getting chain ID:", error);
@@ -958,25 +958,25 @@ export default function RetroCoinCreator() {
 
         console.log("Initializing Farcaster SDK...");
         
-        // Farcaster SDK yükleme yaklaşımları - hata tolerant
+        // Farcaster SDK yÃ¼kleme yaklaÅŸÄ±mlarÄ± - hata tolerant
         try {
-          // YAKLAŞIM 1: doğrudan dist altındaki modülü import et
+          // YAKLAÅIM 1: doÄŸrudan dist altÄ±ndaki modÃ¼lÃ¼ import et
           const sdkModule = await import('@farcaster/frame-sdk/dist').catch(e => null);
           
           if (sdkModule && sdkModule.sdk) {
             farcasterSDK.current = sdkModule.sdk as FarcasterSDK;
-            console.log("✅ Farcaster SDK loaded from dist directory");
+            console.log("âœ… Farcaster SDK loaded from dist directory");
           }
-          // Yaklaşım 1 başarısız olduysa 2. yaklaşımı dene
+          // YaklaÅŸÄ±m 1 baÅŸarÄ±sÄ±z olduysa 2. yaklaÅŸÄ±mÄ± dene
           else {
-            // YAKLAŞIM 2: normal modül import
+            // YAKLAÅIM 2: normal modÃ¼l import
             const fallbackModule = await import('@farcaster/frame-sdk').catch(e => null);
             
             if (fallbackModule && fallbackModule.sdk) {
               farcasterSDK.current = fallbackModule.sdk as FarcasterSDK;
-              console.log("✅ Farcaster SDK loaded from default import");
+              console.log("âœ… Farcaster SDK loaded from default import");
             } else {
-              console.warn("⚠️ Could not load Farcaster SDK - continuing without it");
+              console.warn("âš ï¸ Could not load Farcaster SDK - continuing without it");
               return; // SDK olmadan devam et
             }
           }
@@ -985,7 +985,7 @@ export default function RetroCoinCreator() {
           if (farcasterSDK.current?.actions?.ready) {
             console.log("Calling SDK ready...");
             await farcasterSDK.current.actions.ready();
-            console.log("✅ Farcaster SDK ready");
+            console.log("âœ… Farcaster SDK ready");
           }
           
           // Set initialized flag
@@ -997,8 +997,8 @@ export default function RetroCoinCreator() {
         }
         
       } catch (err) {
-        console.error("❌ SDK initialization error:", err);
-        // Hata durumunda bile UI'da kırılma olmasın
+        console.error("âŒ SDK initialization error:", err);
+        // Hata durumunda bile UI'da kÄ±rÄ±lma olmasÄ±n
       }
     };
     
@@ -1127,3 +1127,4 @@ export default function RetroCoinCreator() {
     </div>
   );
 } 
+

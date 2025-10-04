@@ -31,7 +31,7 @@
     "@supabase/supabase-js": "^2.50.0",
     "@tanstack/react-query": "^5.61.0",
     "@upstash/redis": "^1.34.3",
-    "@zoralabs/coins-sdk": "^0.2.8",
+    "@zoralabs/coins-sdk": "^0.2.11",
     "@zoralabs/protocol-sdk": "^0.6.0",
     "axios": "^1.9.0",
     "buffer": "^6.0.3",

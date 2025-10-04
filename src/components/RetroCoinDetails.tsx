@@ -684,12 +684,6 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
         return;
       }
 
-      // Create account object for the new SDK
-      const account = {
-        address: address as `0x${string}`,
-        type: 'json-rpc' as const,
-      };
-
       // Execute trade using the new Zora SDK
       const receipt = await executeTrade({
         direction: tradeType,
@@ -700,7 +694,7 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
         slippage: 0.05, // 5% slippage
         walletClient,
         publicClient,
-        account
+        account: address as `0x${string}`
       });
 
       console.log("Trade executed successfully:", receipt);

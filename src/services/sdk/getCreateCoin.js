@@ -8,6 +8,7 @@ import {
   validateMetadataURIContent,
   getCoinCreateFromLogs,
   DeployCurrency,
+  InitialPurchaseCurrency,
 } from "@zoralabs/coins-sdk";
 import { base } from "viem/chains";
 import { toast } from "react-hot-toast";
@@ -86,12 +87,10 @@ export async function createZoraCoin(
     // Determine currency - use DeployCurrency enum from SDK
     let selectedCurrency = currency;
     if (selectedCurrency === undefined || selectedCurrency === null) {
-      // Default based on chain as per documentation
-      if (targetChainId === base.id) {
-        selectedCurrency = DeployCurrency.ETH; // Using ETH as default for better compatibility
-      } else {
-        selectedCurrency = DeployCurrency.ETH; // ETH is default on other chains
-      }
+      // Follow SDK defaults strictly: Base mainnet defaults to ZORA currency
+      selectedCurrency = (targetChainId === base.id)
+        ? DeployCurrency.ZORA
+        : DeployCurrency.ETH;
     }
 
     console.log(
@@ -108,7 +107,13 @@ export async function createZoraCoin(
       currency: selectedCurrency, // Use DeployCurrency enum from SDK
       ...(owners && owners.length > 0 && { owners }), // Only include owners if provided
       ...(platformReferrer && { platformReferrer }), // Only include platformReferrer if provided
-      ...(initialPurchaseWei && initialPurchaseWei > 0n && { initialPurchaseWei }), // Include initial purchase if provided
+      // Map legacy initialPurchaseWei into the SDK's initialPurchase object
+      ...(initialPurchaseWei && initialPurchaseWei > 0n && {
+        initialPurchase: {
+          currency: InitialPurchaseCurrency.ETH,
+          amount: initialPurchaseWei,
+        }
+      }),
     };
 
     // Include chainId only if it's different from the current wallet chain

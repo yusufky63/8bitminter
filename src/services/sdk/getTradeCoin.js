@@ -3,9 +3,9 @@
  * @module tradeCoin
  */
 
-import { tradeCoin, setApiKey } from "@zoralabs/coins-sdk";
+import { tradeCoin, createTradeCall, setApiKey } from "@zoralabs/coins-sdk";
 import { ethers } from "ethers";
-import { parseEther } from "viem";
+import { parseEther, parseUnits } from "viem";
 
 // Initialize API key for production environments
 // Uses environment variable or allows manual override
@@ -109,13 +109,35 @@ export async function executeTrade({
       throw new Error("Zora coins trading only supported on Base network (Chain ID: 8453). Please switch to Base network.");
     }
 
+    // Determine sender and recipient addresses
+    const senderAddress = (typeof account === 'string' ? account : account?.address) || recipient;
+    const recipientAddress = recipient || senderAddress;
+
+    // Compute amountIn based on direction (ETH uses parseEther, ERC20 uses parseUnits with token decimals)
+    let amountInBigInt;
+    if (direction === "buy") {
+      amountInBigInt = parseEther(amountIn.toString());
+    } else {
+      // Fetch token decimals for accurate unit conversion when selling
+      try {
+        const erc20DecimalsAbi = [{ constant: true, inputs: [], name: 'decimals', outputs: [{ name: '', type: 'uint8' }], type: 'function' }];
+        const tokenDecimals = await publicClient.readContract({ address: coinAddress, abi: erc20DecimalsAbi, functionName: 'decimals' });
+        amountInBigInt = parseUnits(amountIn.toString(), Number(tokenDecimals ?? 18));
+      } catch (decErr) {
+        console.warn('Failed to fetch token decimals; defaulting to 18', decErr);
+        amountInBigInt = parseUnits(amountIn.toString(), 18);
+      }
+    }
+
     // Trade parameters exactly as per Zora documentation
     const tradeParameters = {
       sell: direction === "buy" ? { type: "eth" } : { type: "erc20", address: coinAddress },
       buy: direction === "buy" ? { type: "erc20", address: coinAddress } : { type: "eth" },
-      amountIn: parseEther(amountIn.toString()),
+      amountIn: amountInBigInt,
       slippage: slippage,
-      sender: recipient
+      sender: senderAddress,
+      signer: senderAddress,
+      recipient: recipientAddress,
     };
 
     console.log("=== TRADE PARAMETERS ===");
@@ -125,14 +147,32 @@ export async function executeTrade({
     console.log("Slippage:", tradeParameters.slippage);
     console.log("Sender:", tradeParameters.sender);
 
+    // First, try to create a quote so we can surface better errors if it fails
+    console.log("=== PREVIEW QUOTE (createTradeCall) ===");
+    try {
+      const quote = await createTradeCall(tradeParameters);
+      console.log("Quote OK:", quote);
+    } catch (qErr) {
+      console.error("Quote error details:", qErr);
+      // Normalize common quote failures
+      const qMsg = (qErr?.message || "Quote failed");
+      // Provide user-friendly hint
+      throw new Error(
+        qMsg.includes("500") || qMsg.toLowerCase().includes("internal")
+          ? "Quote failed (Zora API). If this is a newly created coin, wait ~2-5 minutes and try again."
+          : `Quote failed: ${qMsg}`
+      );
+    }
+
     // Call tradeCoin function exactly as documented
     console.log("=== CALLING ZORA tradeCoin ===");
     
     const result = await tradeCoin({
       tradeParameters,
       walletClient,
-      account,
-      publicClient
+      account: senderAddress,
+      publicClient,
+      validateTransaction: false
     });
 
     console.log("=== TRADE SUCCESS ===");
