@@ -8,6 +8,7 @@ import { toast } from "react-hot-toast";
 import CoinDetails from "./RetroCoinDetails";
 import { resolveImageUrl } from "../utils/ipfs";
 import { Camera } from "lucide-react";
+import { RetroTokenCard, type RetroToken } from "./RetroTokenCard";
 
 interface TokenBalance {
   address: string;
@@ -808,66 +809,21 @@ export default function CoinHolderView() {
           <p className="text-retro-secondary text-xs pixelated">LOADING PORTFOLIO...</p>
         </div>
       ) : tokens.length > 0 ? (
-        <div className="grid grid-cols-1 gap-2">
-          {tokens.map((token, index) => (
-            <div
-              key={token.address}
-              className="group bg-black/40 p-3 border border-retro-primary hover:border-retro-accent transition-all duration-200 cursor-pointer hover:bg-retro-primary/5"
-              onClick={() => handleTokenClick(token.address)}
-            >
-              <div className="flex items-center gap-3">
-                {/* Token Icon */}
-                <TokenImage imageUrl={token.imageUrl} symbol={token.symbol} name={token.name} />
-                
-                {/* Token Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-bold text-retro-primary pixelated">
-                        {token.symbol.length > 8 ? `${token.symbol.substring(0, 8)}...` : token.symbol}
-                      </h3>
-                      <span className="text-xs text-retro-secondary font-mono truncate max-w-[100px]">
-                        {token.name.length > 15 ? `${token.name.substring(0, 15)}...` : token.name}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-bold text-retro-accent pixelated">
-                        ${calculateUSDValue(token)}
-                      </div>
-                      <div className="text-xs text-retro-secondary opacity-60">
-                        {token.balance} {token.symbol}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Compact metrics row */}
-                  <div className="flex items-center gap-4 mt-1 text-xs text-retro-secondary">
-                    {token.marketCap && (
-                      <span>
-                        <span className="opacity-60">MC:</span> ${formatCurrency(token.marketCap)}
-                      </span>
-                    )}
-                    {token.volumeDay && (
-                      <span>
-                        <span className="opacity-60">24H:</span> ${formatCurrency(token.volumeDay)}
-                      </span>
-                    )}
-                    {token.holders !== undefined && (
-                      <span className="flex items-center gap-1">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-60">
-                          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-                          <circle cx="9" cy="7" r="4"/>
-                          <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
-                          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                        </svg>
-                        {token.holders.toLocaleString()}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {tokens.map((t) => {
+            const mapped: RetroToken = {
+              address: t.address,
+              name: t.name,
+              symbol: t.symbol,
+              image: t.imageUrl ? resolveImageUrl(t.imageUrl) : undefined,
+              marketCapUsd: t.marketCap ? parseFloat(t.marketCap) : undefined,
+              volume24hUsd: t.volumeDay ? parseFloat(t.volumeDay) : undefined,
+              holders: t.holders,
+            };
+            return (
+              <RetroTokenCard key={t.address} token={mapped} onClick={(addr) => handleTokenClick(addr)} />
+            );
+          })}
         </div>
       ) : (
         <div className="text-center py-8 border-2 border-retro-primary bg-gradient-to-br from-retro-primary/5 to-black/40">

@@ -412,6 +412,28 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
     [address]
   );
 
+  // Creator non-sellable allocation handling
+  const CREATOR_NON_SELLABLE = 10_000_000; // 10M tokens
+  const isCreator = useCallback(() => {
+    try {
+      if (!address || !tokenDetails?.creator?.address) return false;
+      return tokenDetails.creator.address.toLowerCase() === address.toLowerCase();
+    } catch {
+      return false;
+    }
+  }, [address, tokenDetails?.creator?.address]);
+
+  const getSellableBalance = useCallback((): bigint => {
+    try {
+      if (!isCreator()) return userTokenBalance;
+      const nonSellable = BigInt(CREATOR_NON_SELLABLE) * (10n ** 18n);
+      if (userTokenBalance <= nonSellable) return 0n;
+      return userTokenBalance - nonSellable;
+    } catch {
+      return userTokenBalance;
+    }
+  }, [isCreator, userTokenBalance]);
+
   // Fetch comments with corrected structure
   const fetchCommentsData = useCallback(
     async (tokenAddress: string, after: string | null = null) => {
@@ -531,7 +553,7 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
       setTradeAmount(newAmount);
     } else {
       // For sell, calculate percentage of token balance
-      const tokenBalanceNumber = Number(userTokenBalance) / 10 ** 18;
+      const tokenBalanceNumber = Number(getSellableBalance()) / 10 ** 18;
       const tokenAmountToSell = tokenBalanceNumber * (percentage / 100);
 
       // Format the token amount appropriately
@@ -573,7 +595,7 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
       setTradeAmount(newAmount);
     } else {
       // For sell, calculate percentage of token balance
-      const tokenBalanceNumber = Number(userTokenBalance) / 10 ** 18;
+      const tokenBalanceNumber = Number(getSellableBalance()) / 10 ** 18;
       const tokenAmountToSell = tokenBalanceNumber * (value / 100);
 
       // Format the token amount appropriately
@@ -609,7 +631,7 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
         );
       } else {
         // For sell trades, calculate based on token balance
-        const tokenBalanceNumber = Number(userTokenBalance) / 10 ** 18;
+        const tokenBalanceNumber = Number(getSellableBalance()) / 10 ** 18;
         const tokenAmountToSell =
           tokenBalanceNumber * (selectedPurchasePercentage / 100);
 
@@ -670,6 +692,16 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
 
       // Balance validation with proper typing
       const amountInWei = parseEther(tradeAmount);
+      // Additional guard: if creator, exclude non-sellable 10M from sellable amount
+      if (tradeType === 'sell') {
+        const sellable = getSellableBalance();
+        if (amountInWei > sellable) {
+          const maxSell = Number(sellable) / 10 ** 18;
+          toast.error(`You can sell up to ${maxSell.toFixed(4)} ${tokenDetails.symbol}`);
+          setIsTrading(false);
+          return;
+        }
+      }
       const validation = (await validateTradeBalance(
         address,
         tokenDetails.address,
@@ -1216,7 +1248,7 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
         setTradeAmount(newAmount);
       } else {
         // For sell, calculate directly from token balance
-        const tokenBalanceNumber = Number(userTokenBalance) / 10 ** 18;
+        const tokenBalanceNumber = Number(getSellableBalance()) / 10 ** 18;
         const tokenAmountToSell =
           tokenBalanceNumber * (selectedPurchasePercentage / 100);
 
@@ -1241,6 +1273,7 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
     isCustomAmount,
     tradeType,
     userTokenBalance,
+    getSellableBalance,
   ]);
 
   return (

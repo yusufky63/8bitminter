@@ -19,7 +19,7 @@ import {
   fetchWithRetry,
 } from "../services/sdk/getMarket.js";
 import CoinDetails from "./RetroCoinDetails";
-import { CoinCard } from "./CoinCard";
+import { RetroTokenCard, type RetroToken } from "./RetroTokenCard";
 import { resolveImageUrl, loadImageWithFallback } from "../utils/ipfs";
 import {
   Home,
@@ -878,90 +878,32 @@ export default function RetroCoinExplorer({
 
         {/* Market data tokens list */}
         {!isLoading && !tokenDetails && tokensData.length > 0 && (
-          <div className="space-y-3 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-6">
             {getCurrentTokens()
               .filter(
                 (token) =>
                   !searchTerm ||
                   token.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  token.symbol
-                    .toLowerCase()
-                    .includes(searchTerm.toLowerCase()) ||
+                  token.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
                   token.address.toLowerCase().includes(searchTerm.toLowerCase())
               )
-              .map((token, index) => (
-                <div
-                  key={token.address || `token-${index}`}
-                  className="bg-retro-darker border-2 border-retro-primary p-3 hover:border-retro-accent transition-all duration-200 cursor-pointer hover:shadow-[0_0_10px_rgba(255,107,53,0.2)]"
-                  onClick={() => handleViewDetails(token.address)}
-                >
-                  <div className="flex items-center gap-3">
-                    <TokenImage
-                      imageUrl={token.imageUri}
-                      name={token.name || "Unknown"}
-                      size="large"
-                    />
-
-                    <div className="flex-1">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <h3 className="text-sm font-bold text-retro-primary mb-1">
-                            {token.symbol && token.symbol.length > 10
-                              ? token.symbol.substring(0, 8) + "..."
-                              : token.symbol || "UNK"}
-                          </h3>
-                        </div>
-
-                        <div className="text-right">
-                          {token.marketCapDelta24h !== null &&
-                            token.marketCapDelta24h !== undefined && (
-                              <div
-                                className={`text-xs font-medium ${
-                                  format24hChange(
-                                    token.marketCapDelta24h || null
-                                  ).color
-                                }`}
-                              >
-                                {
-                                  format24hChange(
-                                    token.marketCapDelta24h || null
-                                  ).text
-                                }
-                              </div>
-                            )}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-3 text-xs">
-                        {token.marketCap && (
-                          <div className="flex items-center gap-1">
-                            <span className="text-retro-secondary">MC:</span>
-                            <span className="text-retro-accent font-medium">
-                              ${formatNumber(token.marketCap)}
-                            </span>
-                          </div>
-                        )}
-                        {token.volume && (
-                          <div className="flex items-center gap-1">
-                            <span className="text-retro-secondary">VOL:</span>
-                            <span className="text-retro-accent font-medium">
-                              ${formatNumber(token.volume)}
-                            </span>
-                          </div>
-                        )}
-                        {token.holders !== undefined && (
-                          <div className="flex items-center gap-1">
-                            <span className="text-retro-secondary">H:</span>
-                            <span className="text-retro-accent font-medium">
-                              {formatNumber(token.holders.toString())}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+              .map((t, index) => {
+                const mapped: RetroToken = {
+                  address: t.address,
+                  name: t.name || t.symbol,
+                  symbol: t.symbol,
+                  image: t.imageUri,
+                  priceUsd: t.price ? parseFloat(t.price as any) : undefined,
+                  marketCapUsd: t.marketCap ? parseFloat(t.marketCap) : undefined,
+                  volume24hUsd: t.volume ? parseFloat(t.volume) : undefined,
+                  change24hPct: typeof t.marketCapDelta24h === 'number' ? t.marketCapDelta24h : undefined,
+                  holders: t.holders,
+                  currency: 'ETH',
+                };
+                return (
+                  <RetroTokenCard key={t.address || `token-${index}`} token={mapped} onClick={handleViewDetails} />
+                );
+              })}
           </div>
         )}
         {/* Debug info for development */}
@@ -1068,78 +1010,24 @@ export default function RetroCoinExplorer({
         {/* Results info */}
 
         {/* Coins list */}
-        <div className="space-y-3 mb-2">
-          {currentLocalCoins.map((token) => (
-            <div
-              key={token.address}
-              className="bg-retro-darker border-2 border-retro-primary p-3 hover:border-retro-accent transition-all duration-200 cursor-pointer hover:shadow-[0_0_10px_rgba(255,107,53,0.2)]"
-              onClick={() => handleViewDetails(token.address)}
-            >
-              <div className="flex items-center gap-3">
-                <TokenImage
-                  imageUrl={token.imageUri}
-                  name={token.name || "Unknown"}
-                  size="large"
-                />
-
-                <div className="flex-1">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <h3 className="text-sm font-bold text-retro-primary mb-1">
-                        {token.symbol && token.symbol.length > 10
-                          ? token.symbol.substring(0, 8) + "..."
-                          : token.symbol || "UNK"}
-                      </h3>
-                    </div>
-
-                    <div className="text-right">
-                      {token.marketCapDelta24h !== null &&
-                        token.marketCapDelta24h !== undefined && (
-                          <div
-                            className={`text-xs font-medium ${
-                              format24hChange(token.marketCapDelta24h || null)
-                                .color
-                            }`}
-                          >
-                            {
-                              format24hChange(token.marketCapDelta24h || null)
-                                .text
-                            }
-                          </div>
-                        )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-3 text-xs">
-                    {token.marketCap && (
-                      <div className="flex items-center gap-1">
-                        <span className="text-retro-secondary">MC:</span>
-                        <span className="text-retro-accent font-medium">
-                          ${formatNumber(token.marketCap)}
-                        </span>
-                      </div>
-                    )}
-                    {token.volume && (
-                      <div className="flex items-center gap-1">
-                        <span className="text-retro-secondary">VOL:</span>
-                        <span className="text-retro-accent font-medium">
-                          ${formatNumber(token.volume)}
-                        </span>
-                      </div>
-                    )}
-                    {token.holders !== undefined && (
-                      <div className="flex items-center gap-1">
-                        <span className="text-retro-secondary">H:</span>
-                        <span className="text-retro-accent font-medium">
-                          {formatNumber(token.holders.toString())}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-2">
+          {currentLocalCoins.map((t) => {
+            const mapped: RetroToken = {
+              address: t.address,
+              name: t.name,
+              symbol: t.symbol,
+              image: t.imageUri,
+              priceUsd: t.price ? parseFloat(t.price) : undefined,
+              marketCapUsd: t.marketCap ? parseFloat(t.marketCap) : undefined,
+              volume24hUsd: t.volume ? parseFloat(t.volume) : undefined,
+              change24hPct: typeof t.marketCapDelta24h === 'number' ? t.marketCapDelta24h : undefined,
+              holders: t.holders,
+              currency: 'ETH',
+            };
+            return (
+              <RetroTokenCard key={t.address} token={mapped} onClick={handleViewDetails} />
+            );
+          })}
         </div>
 
         {/* Pagination */}

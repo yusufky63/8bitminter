@@ -17,7 +17,7 @@ import { RetroNotification } from "./RetroNotification";
 
 // Services
 import { getCoinCategories } from "../services/aiService.js";
-import { processTtlgenHerImage } from "../services/imageUtils";
+import { processTogetherImageToIPFS as processTtlgenHerImage } from "../services/togetherIpfs";
 import { createZoraCoin, getCoinAddressFromReceipt, DeployCurrency } from "../services/sdk/getCreateCoin.js";
 import { CoinService, type CreateCoinData } from "../services/coinService";
 
@@ -539,7 +539,7 @@ export default function RetroCoinCreator() {
             }));
           
             // Set display URL for UI
-            setDisplayImageUrl(data.imageUrl);
+            setDisplayImageUrl(processedImage.displayUrl);
               
             toast.success("Image metadata uploaded to IPFS successfully!", { 
               id: 'status-toast'
@@ -1127,4 +1127,5 @@ export default function RetroCoinCreator() {
     </div>
   );
 } 
+
 
