@@ -7,6 +7,7 @@ import { base } from "wagmi/chains";
 import { http } from "wagmi";
 import { farcasterFrame as miniAppConnector } from "@farcaster/frame-wagmi-connector";
 import { injected } from 'wagmi/connectors';
+import { sdk } from "@farcaster/miniapp-sdk";
 import { FarcasterProvider } from '../lib/farcaster';
 
 // Create Wagmi configuration for both Farcaster mini-apps and BaseApp
@@ -16,7 +17,7 @@ const config = createConfig({
     [base.id]: http(),
   },
   connectors: [
-    // Farcaster connector for Warpcast/Farcaster apps
+    // Farcaster connector for Farcaster mini-apps
     miniAppConnector(),
     // Injected connector for BaseApp and browser wallets
     injected({
@@ -40,9 +41,22 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   // Track whether we've mounted in the browser
   const [mounted, setMounted] = useState(false);
 
-  // Only run on client-side
   useEffect(() => {
     setMounted(true);
+
+    const signalMiniAppReady = async () => {
+      try {
+        await sdk.actions.ready();
+      } catch (error) {
+        // Swallow errors when not running inside the Base or Farcaster mini-app runtime
+        if (process.env.NODE_ENV !== 'production') {
+          console.debug('MiniApp SDK ready signal skipped', error);
+        }
+      }
+    };
+
+    // Notify BaseApp/Farcaster runtime that the UI is ready to display
+    signalMiniAppReady();
   }, []);
 
   return (

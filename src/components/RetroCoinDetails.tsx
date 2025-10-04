@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { useAccount, usePublicClient, useWriteContract } from "wagmi";
+import { useAccount, usePublicClient, useWriteContract, useWalletClient } from "wagmi";
 import { toast } from "react-hot-toast";
 import { getCoinDetails, fetchCoinComments } from "../services/sdk/getCoins.js";
 import { resolveImageUrl } from "../utils/ipfs";
@@ -10,7 +10,7 @@ import {
   validateTradeBalance,
   checkETHBalance,
   checkTokenBalance,
-  getTradeContractCallParams,
+  executeTrade,
 } from "../services/sdk/getTradeCoin.js";
 import {
   getOnchainTokenDetails,
@@ -145,6 +145,7 @@ interface Comment {
 export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
 
   // useWriteContract hook'unu kullan
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
@@ -632,13 +633,15 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
     }
   };
 
-  // Handle trade click with proper implementation
+  // Handle trade click with updated Zora SDK implementation
   const handleTradeClick = async () => {
-    if (!tokenDetails || !isConnected || !publicClient) {
+    if (!tokenDetails || !isConnected || !publicClient || !walletClient || !address) {
       if (!isConnected) {
         toast.error("Please connect your wallet first");
       } else if (!publicClient) {
         toast.error("Public client not ready");
+      } else if (!walletClient) {
+        toast.error("Wallet client not ready");
       }
       return;
     }
@@ -651,13 +654,6 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
       setIsTrading(true);
       setTransactionStatus("pending");
 
-      // Validate the trade parameters
-      if (!tokenDetails.address || !address) {
-        toast.error("Missing token or account information");
-        setIsTrading(false);
-        return;
-      }
-
       // Parse amount as value
       const amountValue = parseFloat(tradeAmount);
       if (isNaN(amountValue) || amountValue <= 0) {
@@ -666,16 +662,14 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
         return;
       }
 
-      // Convert to Wei format
-      const amountInWei = parseEther(tradeAmount);
-
       console.log(`${tradeType} transaction amount:`, {
         amount: tradeAmount,
-        amountInWei: amountInWei.toString(),
         token: tokenDetails.symbol,
+        coinAddress: tokenDetails.address,
       });
 
       // Balance validation with proper typing
+      const amountInWei = parseEther(tradeAmount);
       const validation = (await validateTradeBalance(
         address,
         tokenDetails.address,
@@ -690,33 +684,31 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
         return;
       }
 
-      // Get trade parameters from Zora SDK with proper typing
-      const tradeParams = getTradeContractCallParams(
-        tradeType,
-        tokenDetails.address,
-        address,
-        amountInWei,
-        BigInt(0), // minAmountOut - setting this to 0 for now, should set a reasonable minimum for production
-        undefined // referrerAddress
-      ) as TradeContractParams;
+      // Create account object for the new SDK
+      const account = {
+        address: address as `0x${string}`,
+        type: 'json-rpc' as const,
+      };
 
-      console.log("Transaction parameters:", {
-        address: tradeParams.address,
-        functionName: tradeParams.functionName,
-        argsCount: tradeParams.args.length,
-        args: tradeParams.args,
-        value: tradeParams.value ? tradeParams.value.toString() : "0",
+      // Execute trade using the new Zora SDK
+      const receipt = await executeTrade({
+        direction: tradeType,
+        coinAddress: tokenDetails.address,
+        amountIn: tradeAmount,
+        recipient: address,
+        referrer: "0xbFA6A45Dd534d39dF47A3F3D2f2b6E88416f9831",
+        slippage: 0.05, // 5% slippage
+        walletClient,
+        publicClient,
+        account
       });
 
-      // Execute trade using writeContractAsync
-      const hash = await writeContractAsync(tradeParams);
-
-      console.log(`Transaction sent: ${hash}`);
+      console.log("Trade executed successfully:", receipt);
 
       // Improved success toast with more details and longer duration
       if (tradeType === "buy") {
         toast.success(
-          `Successfully bought ${tokenDetails.symbol}! Transaction sent.`,
+          `Successfully bought ${tokenDetails.symbol}! Transaction confirmed.`,
           {
             id: "trade-toast",
             duration: 6000, // 6 seconds
@@ -725,9 +717,7 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
         );
       } else {
         toast.success(
-          `Successfully sold ${
-            tokenDetails.symbol
-          }! You'll receive ~${estimateEthReturn(tradeAmount)} ETH.`,
+          `Successfully sold ${tokenDetails.symbol}! Transaction confirmed.`,
           {
             id: "trade-toast",
             duration: 6000, // 6 seconds
@@ -752,7 +742,6 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
           id: "trade-toast",
           duration: 4000,
         });
-        // Kullanıcı reddettiğinde işlem sonlandı, yeni istek göndermeyi engelle
         setTransactionStatus("idle");
       } else {
         // Create a more user-friendly error message
@@ -763,7 +752,9 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
             errorMessage = `Gas estimation failed. You may need to adjust the amount.`;
           } else if (err.message.includes("insufficient")) {
             errorMessage = `Insufficient funds for transaction`;
-          } else if (err.message.length < 50) {
+          } else if (err.message.includes("slippage")) {
+            errorMessage = `Trade failed due to price slippage. Try again with a smaller amount.`;
+          } else if (err.message.length < 100) {
             // Only include the actual error if it's reasonably short
             errorMessage = `Error: ${err.message}`;
           }
@@ -975,7 +966,7 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
     }
   };
 
-  // Improved ETH return estimation for selling that better matches Warpcast values
+  // Improved ETH return estimation for selling that better matches Farcaster values
   const estimateEthReturn = (tokenAmountStr: string): string => {
     try {
       const amount = parseFloat(tokenAmountStr);

@@ -36,6 +36,20 @@ export default function RootLayout({
       }
     }
   };
+
+  // Define the Base mini-app embed metadata
+  const miniAppMeta = {
+    version: "next",
+    imageUrl: `${baseUrl}/opengraph-image.png`,
+    button: {
+      title: "Launch Mini App",
+      action: {
+        type: "launch_miniapp",
+        name: "8BitCoiner",
+        url: baseUrl
+      }
+    }
+  };
   
   return (
     <html lang="en">
@@ -73,6 +87,9 @@ export default function RootLayout({
         <meta name="fc:frame" content={JSON.stringify(frameJson)} />
         <meta name="fc:frame:image" content={`${baseUrl}/opengraph-image.png`} />
         <meta name="fc:frame:button:1" content="Create Coin" />
+
+        {/* Base mini-app embed metadata */}
+        <meta name="fc:miniapp" content={JSON.stringify(miniAppMeta)} />
 
         {/* Allow embedding from anywhere */}
         <meta httpEquiv="X-Frame-Options" content="ALLOWALL" />

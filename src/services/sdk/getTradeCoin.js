@@ -3,9 +3,9 @@
  * @module tradeCoin
  */
 
-import { createTradeCall, getCoinCreateFromLogs } from "@zoralabs/coins-sdk";
-import { setApiKey } from "@zoralabs/coins-sdk";
+import { tradeCoin, setApiKey } from "@zoralabs/coins-sdk";
 import { ethers } from "ethers";
+import { parseEther } from "viem";
 
 // Initialize API key for production environments
 // Uses environment variable or allows manual override
@@ -13,7 +13,9 @@ const initializeApiKey = () => {
   const apiKey = process.env.NEXT_PUBLIC_ZORA_API_KEY;
   if (apiKey) {
     setApiKey(apiKey);
-    console.log("Zora API key initialized from environment variables");
+    console.log("Zora API key initialized from environment variables:", apiKey.substring(0, 8) + "...");
+  } else {
+    console.warn("Zora API key not found! Trading may fail without API key.");
   }
 };
 
@@ -21,48 +23,139 @@ const initializeApiKey = () => {
 initializeApiKey();
 
 /**
- * Prepares contract call parameters for trade operation
- * @param {string} direction - Trade direction ('buy' or 'sell')
- * @param {string} coinAddress - Coin address
- * @param {string} recipientAddress - Recipient address
- * @param {bigint} orderSize - Order size
- * @param {bigint} minAmountOut - Minimum output amount
- * @param {string} [referrerAddress] - Referrer address
- * @returns {object} Contract call parameters
+ * Validates if a coin is tradeable on Zora
+ * @param {string} coinAddress - Coin address to validate
+ * @returns {Promise<boolean>} Whether the coin is tradeable
  */
-export function getTradeContractCallParams(
+export async function validateCoinForTrade(coinAddress) {
+  try {
+    // Import getCoin to check if coin exists and has necessary data
+    const { getCoin } = await import("@zoralabs/coins-sdk");
+    
+    // getCoin expects an object with address property, not just the address string
+    const coinData = await getCoin({ address: coinAddress });
+    
+    // Check if coin has necessary trading data
+    if (!coinData || !coinData.address) {
+      console.warn("Coin not found or invalid:", coinAddress);
+      return false;
+    }
+    
+    // Additional validation for Zora coins
+    // Check if it's a proper Zora coin with the expected structure
+    if (coinData.contractType !== 'ERC20z' && !coinData.symbol) {
+      console.warn("Coin may not be a valid Zora coin:", coinAddress);
+      return false;
+    }
+    
+    console.log("Coin validation successful:", {
+      name: coinData.name || "Unknown",
+      symbol: coinData.symbol || "Unknown",
+      address: coinData.address
+    });
+    return true;
+  } catch (error) {
+    console.error("Coin validation failed:", error.message);
+    // For API validation errors, skip validation and allow trade to proceed
+    // The trade will fail with better error messages if the coin is truly invalid
+    if (error.message?.includes("400") || error.message?.includes("invalid data") || 
+        error.message?.includes("required property") || error.message?.includes("fetch") || 
+        error.message?.includes("network")) {
+      console.warn("API validation failed, allowing trade to proceed - trade will handle validation");
+      return true;
+    }
+    return false;
+  }
+}
+
+/**
+ * Executes a trade using the simplest Zora SDK approach
+ * @param {Object} params - Trade parameters
+ * @param {string} params.direction - Trade direction ('buy' or 'sell')
+ * @param {string} params.coinAddress - Coin address
+ * @param {string} params.amountIn - Amount to trade (ETH for buy, tokens for sell)
+ * @param {string} params.recipient - Recipient address
+ * @param {string} [params.referrer] - Platform referrer address
+ * @param {number} [params.slippage] - Slippage tolerance (default: 0.05 = 5%)
+ * @param {Object} params.walletClient - Viem wallet client
+ * @param {Object} params.publicClient - Viem public client
+ * @param {Object} params.account - Account object
+ * @returns {Promise<Object>} Transaction receipt
+ */
+export async function executeTrade({
   direction,
   coinAddress,
-  recipientAddress,
-  orderSize,
-  minAmountOut,
-  referrerAddress = null
-) {
+  amountIn,
+  recipient,
+  referrer = "0xbFA6A45Dd534d39dF47A3F3D2f2b6E88416f9831",
+  slippage = 0.05,
+  walletClient,
+  publicClient,
+  account
+}) {
   try {
-    if (!recipientAddress) {
-      throw new Error("Recipient address is required");
+    console.log("=== ZORA TRADE EXECUTION START ===");
+    console.log("Direction:", direction);
+    console.log("Coin Address:", coinAddress);
+    console.log("Amount In:", amountIn);
+    console.log("Recipient:", recipient);
+    console.log("Account:", account);
+
+    // Validate Base network requirement (Zora SDK only supports Base mainnet)
+    const chainId = await walletClient.getChainId();
+    console.log("Current chain ID:", chainId);
+    
+    if (chainId !== 8453) {
+      throw new Error("Zora coins trading only supported on Base network (Chain ID: 8453). Please switch to Base network.");
     }
 
-    const params = createTradeCall({
-      coinAddress: coinAddress,
-      direction: direction === "buy" ? "buy" : "sell",
-      recipient: recipientAddress,
-      orderSize,
-      minAmountOut: 0n,
-      tradeReferrer: referrerAddress || recipientAddress,
+    // Trade parameters exactly as per Zora documentation
+    const tradeParameters = {
+      sell: direction === "buy" ? { type: "eth" } : { type: "erc20", address: coinAddress },
+      buy: direction === "buy" ? { type: "erc20", address: coinAddress } : { type: "eth" },
+      amountIn: parseEther(amountIn.toString()),
+      slippage: slippage,
+      sender: recipient
+    };
+
+    console.log("=== TRADE PARAMETERS ===");
+    console.log("Sell:", tradeParameters.sell);
+    console.log("Buy:", tradeParameters.buy);
+    console.log("Amount In (BigInt):", tradeParameters.amountIn.toString());
+    console.log("Slippage:", tradeParameters.slippage);
+    console.log("Sender:", tradeParameters.sender);
+
+    // Call tradeCoin function exactly as documented
+    console.log("=== CALLING ZORA tradeCoin ===");
+    
+    const result = await tradeCoin({
+      tradeParameters,
+      walletClient,
+      account,
+      publicClient
     });
 
-    if (direction === "buy") {
-      return {
-        ...params,
-        value: orderSize,
-      };
-    }
+    console.log("=== TRADE SUCCESS ===");
+    console.log("Result:", result);
+    return result;
 
-    return params;
   } catch (error) {
-    console.error("Contract parameter preparation error:", error);
-    throw error;
+    console.error("=== TRADE ERROR ===");
+    console.error("Error object:", error);
+    console.error("Error message:", error.message);
+    console.error("Error stack:", error.stack);
+    
+    // Specific error handling for common issues
+    if (error.message?.includes("Quote failed") || error.message?.includes("500")) {
+      throw new Error("Bu coin henüz trading için hazır değil. Coin oluşturulduktan sonra birkaç dakika bekleyin ve tekrar deneyin. Zora sisteminin coin'i tanıması gerekiyor.");
+    }
+    
+    if (error.message?.includes("Internal Server Error")) {
+      throw new Error("Zora API şu anda erişilemiyor. Lütfen birkaç dakika sonra tekrar deneyin.");
+    }
+    
+    // Re-throw with original error message for debugging
+    throw new Error(`Zora trade failed: ${error.message}`);
   }
 }
 
@@ -274,7 +367,7 @@ export const validateTradeBalance = async (
 
     if (tradeType === "buy") {
       const ethBalance = await checkETHBalance(userAddress, publicClient);
-      const gasReserve = 1n * 10n ** 14n; // 0.0001 ETH
+      const gasReserve = 5n * 10n ** 13n; // 0.00005 ETH (reduced gas reserve)
       const availableBalance =
         ethBalance > gasReserve ? ethBalance - gasReserve : 0n;
       
@@ -305,13 +398,13 @@ export const validateTradeBalance = async (
       
       // Also check if user has enough ETH for gas
       const ethBalance = await checkETHBalance(userAddress, publicClient);
-      const gasReserve = 1n * 10n ** 14n; // 0.0001 ETH for gas
+      const gasReserve = 5n * 10n ** 13n; // 0.00005 ETH (reduced gas reserve) for gas
       
       if (ethBalance < gasReserve) {
         return {
           isValid: false,
           currentBalance: ethBalance,
-          message: `Insufficient ETH for gas fees. You need at least 0.0001 ETH for gas.`,
+          message: `Insufficient ETH for gas fees. You need at least 0.00005 ETH for gas.`,
         };
       }
     }

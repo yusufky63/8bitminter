@@ -108,6 +108,7 @@ export async function createZoraCoin(
       currency: selectedCurrency, // Use DeployCurrency enum from SDK
       ...(owners && owners.length > 0 && { owners }), // Only include owners if provided
       ...(platformReferrer && { platformReferrer }), // Only include platformReferrer if provided
+      ...(initialPurchaseWei && initialPurchaseWei > 0n && { initialPurchaseWei }), // Include initial purchase if provided
     };
 
     // Include chainId only if it's different from the current wallet chain
@@ -115,23 +116,55 @@ export async function createZoraCoin(
       coinParams.chainId = chainId;
     }
 
-    console.log("Creating coin with SDK parameters:", {
-      ...coinParams,
-      currencyType: selectedCurrency === DeployCurrency.ZORA ? "ZORA" : "ETH",
-      initialPurchaseWei: initialPurchaseWei.toString(),
-    });
+    console.log("=== COIN CREATION PARAMETERS ===");
+    console.log("Name:", name);
+    console.log("Symbol:", symbol);
+    console.log("URI:", uri);
+    console.log("Payout Recipient:", payoutRecipient);
+    console.log("Currency:", selectedCurrency === DeployCurrency.ZORA ? "ZORA" : "ETH");
+    console.log("Platform Referrer:", platformReferrer);
+    console.log("Initial Purchase Wei:", initialPurchaseWei?.toString() || "0");
+    console.log("Initial Purchase ETH:", initialPurchaseWei ? (Number(initialPurchaseWei) / 10**18).toString() : "0");
+    console.log("Owners:", owners);
+    console.log("Chain ID:", chainId);
+    console.log("Final coinParams:", coinParams);
 
-    // Use the SDK's createCoin function with proper options
-    const result = await createCoin(coinParams, walletClient, publicClient, {
-      gasMultiplier: 120, // Add 20% buffer to gas (recommended)
-      // For ETH currency with initial purchase, SDK should handle value automatically
-    });
+    // Use the SDK's createCoin function with minimal overhead
+    // Removed gasMultiplier entirely to minimize deployment costs
+    const result = await createCoin(coinParams, walletClient, publicClient);
 
-    console.log("Coin created successfully with SDK:", {
-      hash: result.hash,
-      address: result.address,
-      deployment: result.deployment,
-    });
+    console.log("=== COIN CREATION SUCCESS ===");
+    console.log("Transaction Hash:", result.hash);
+    console.log("Coin Address:", result.address);
+    console.log("Deployment Details:", result.deployment);
+    console.log("Full Result:", result);
+    
+    // Check if initial purchase was made
+    if (initialPurchaseWei && initialPurchaseWei > 0n) {
+      console.log("✅ Initial purchase was requested:", (Number(initialPurchaseWei) / 10**18).toString(), "ETH");
+      
+      // Check transaction value to see if initial purchase ETH was sent
+      try {
+        const receipt = await publicClient.getTransactionReceipt({ hash: result.hash });
+        console.log("Transaction Receipt:", receipt);
+        console.log("Transaction Status:", receipt.status);
+        console.log("Gas Used:", receipt.gasUsed?.toString());
+        
+        const tx = await publicClient.getTransaction({ hash: result.hash });
+        console.log("Transaction Value:", tx.value?.toString(), "wei");
+        console.log("Transaction Value ETH:", tx.value ? (Number(tx.value) / 10**18).toString() : "0", "ETH");
+        
+        if (tx.value && tx.value >= initialPurchaseWei) {
+          console.log("✅ Initial purchase ETH was sent with transaction");
+        } else {
+          console.log("❌ Initial purchase ETH was NOT sent with transaction");
+        }
+      } catch (error) {
+        console.error("Error checking transaction details:", error);
+      }
+    } else {
+      console.log("ℹ️ No initial purchase was requested");
+    }
 
     return result;
   } catch (error) {

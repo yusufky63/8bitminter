@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useAccount, useConnect, useWalletClient, usePublicClient } from "wagmi";
+import { useAccount, useConnect, useWalletClient, usePublicClient, useSwitchChain } from "wagmi";
 import { toast } from "react-hot-toast";
 import { parseEther } from "viem";
 import { base } from "viem/chains";
@@ -126,7 +126,7 @@ export default function RetroCoinCreator() {
   const [ownersAddresses, setOwnersAddresses] = useState<string[]>([]);
   const [newOwnerAddress, setNewOwnerAddress] = useState<string>("");
   const [selectedCurrency, setSelectedCurrency] = useState<number>(DeployCurrency.ETH);
-  const [platformReferrer, setPlatformReferrer] = useState<string>("");
+  const [platformReferrer, setPlatformReferrer] = useState<string>("0xbFA6A45Dd534d39dF47A3F3D2f2b6E88416f9831");
   
   // AI generations
   const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
@@ -141,6 +141,7 @@ export default function RetroCoinCreator() {
   const { connect, connectors } = useConnect();
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
+  const { switchChain } = useSwitchChain();
 
   // Debug environment and connectors
   useEffect(() => {
@@ -616,13 +617,43 @@ export default function RetroCoinCreator() {
     }
 
     try {
-      // Check if we're on the Base network
+      // Check if we're on the Base network and auto-switch if needed
       const chainId = await walletClient.getChainId();
       if (chainId !== base.id) {
-        setError(`You're connected to network ID ${chainId}, but Base network (${base.id}) is required. Please switch networks.`);
-        toast.error("Please switch to Base network", { id: 'status-toast', duration: 5000 });
-        setIsLoading(false);
-        return;
+        console.log(`Currently on network ${chainId}, switching to Base network (${base.id})`);
+        
+        try {
+          // Attempt to switch to Base network
+          toast.loading("Switching to Base network...", { id: 'network-switch' });
+          
+          await switchChain({ chainId: base.id });
+          
+          toast.success("Successfully switched to Base network", { id: 'network-switch' });
+          
+          // Wait a moment for the switch to complete
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Verify the switch was successful
+          const newChainId = await walletClient.getChainId();
+          if (newChainId !== base.id) {
+            throw new Error("Network switch failed");
+          }
+          
+        } catch (switchError) {
+          console.error("Auto network switch failed:", switchError);
+          
+          const errorMessage = switchError instanceof Error ? switchError.message : "Unknown error";
+          
+          if (errorMessage.includes("rejected") || errorMessage.includes("denied")) {
+            setError("Network switch was rejected. Please manually switch to Base network in your wallet.");
+          } else {
+            setError(`Failed to switch to Base network automatically. Please manually switch to Base network (ID: ${base.id}) in your wallet and try again.`);
+          }
+          
+          toast.error("Please switch to Base network manually", { id: 'network-switch', duration: 5000 });
+          setIsLoading(false);
+          return;
+        }
       }
 
       // Get user address
@@ -643,8 +674,8 @@ export default function RetroCoinCreator() {
         const purchaseAmount = parseEther(selectedPurchaseAmount);
         console.log(`User selected purchase amount: ${purchaseAmount} wei`);
         
-        // Minimum amount needed for the transaction (purchase amount + gas buffer)
-        const gasBuffer = parseEther("0.0002"); // ~0.0002 ETH for gas
+        // Minimum amount needed for the transaction (purchase amount + minimal gas buffer)
+        const gasBuffer = parseEther("0.00005"); // Reduced gas buffer to 0.00005 ETH
         const minimumRequired = purchaseAmount + gasBuffer;
         
         // Check if user has enough balance for transaction
@@ -843,13 +874,13 @@ export default function RetroCoinCreator() {
             userMessage = "BaseApp wallet not available. Please ensure you're using the latest version of BaseApp.";
             break;
           case 'farcaster':
-            userMessage = "Farcaster wallet not available. Please ensure you're using Warpcast app.";
+            userMessage = "Farcaster wallet not available. Please ensure you're using Farcaster app.";
             break;
           case 'browser':
             userMessage = "No wallet found. Please install MetaMask or another Ethereum wallet.";
             break;
           default:
-            userMessage = "Wallet not available in this environment. Please use BaseApp, Warpcast, or a browser with wallet extension.";
+            userMessage = "Wallet not available in this environment. Please use BaseApp, Farcaster, or a browser with wallet extension.";
         }
       } else if (errorMessage.includes("network") || errorMessage.includes("RPC")) {
         userMessage = "Network connection error. Please check your internet connection and try again.";

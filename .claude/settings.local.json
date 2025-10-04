@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm install)"
+      "Bash(npm install)",
+      "WebFetch(domain:docs.zora.co)",
+      "WebFetch(domain:docs.zora.co)"
     ],
     "deny": []
   }

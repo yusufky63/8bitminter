@@ -28,7 +28,7 @@ export function isFarcasterMiniApp(): boolean {
   // Check for common Farcaster environment indicators
   const userAgent = window.navigator.userAgent.toLowerCase();
   return userAgent.includes('farcaster') || 
-         userAgent.includes('warpcast') || 
+         userAgent.includes('farcaster') || 
          window.parent !== window;
 }
 

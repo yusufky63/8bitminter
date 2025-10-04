@@ -3,6 +3,7 @@ import Image from "next/image";
 import { RetroStepScreen } from "./RetroStepScreen";
 import { RetroDivider } from "./RetroDivider";
 import { RetroButton } from "./ui/RetroButton";
+import { detectEnvironment } from '../utils/wallet';
 
 
 interface RetroSuccessProps {
@@ -31,14 +32,45 @@ export function RetroSuccess({
     window.open(`https://zora.co/coin/${contractAddress}`, '_blank');
   };
 
-  // Share on Warpcast
-  const shareOnWarpcast = async () => {
+  // Environment-aware sharing function
+  const shareToken = async () => {
     try {
-      // Create share text with token details and links - now with mini app link
-      const shareText = `I just created ${tokenName} (${tokenSymbol}) on Base network using 8BitCoiner! 🚀\n\n${description}\n\nView on Zora: https://zora.co/coin/${contractAddress}\n\nCreate your own: https://warpcast.com/miniapps/VJFTWn45l8cA/8bitminter`;
+      const environment = detectEnvironment();
+      const shareText = `I just created ${tokenName} (${tokenSymbol}) on Base network using 8BitCoiner! 🚀\n\n${description}\n\nView on Zora: https://zora.co/coin/${contractAddress}\n\nCreate your own: https://farcaster.com/miniapps/VJFTWn45l8cA/8bitminter`;
       
-      // Try to use dynamic import to get the SDK if in browser
-      if (typeof window !== 'undefined') {
+      console.log('Sharing in environment:', environment);
+      
+      // BaseApp sharing (priority)
+      if (environment === 'baseapp') {
+        try {
+          // Use BaseApp's sharing functionality
+          if ((window as any).BaseApp?.share) {
+            await (window as any).BaseApp.share({
+              title: `${tokenName} Token Created!`,
+              text: shareText,
+              url: `https://zora.co/coin/${contractAddress}`
+            });
+            console.log("Shared using BaseApp");
+            return;
+          }
+          
+          // Fallback to native share API if available
+          if (navigator.share) {
+            await navigator.share({
+              title: `${tokenName} Token Created!`,
+              text: shareText,
+              url: `https://zora.co/coin/${contractAddress}`
+            });
+            console.log("Shared using native Web Share API");
+            return;
+          }
+        } catch (baseAppError) {
+          console.log("BaseApp sharing failed, falling back to Farcaster", baseAppError);
+        }
+      }
+      
+      // Farcaster sharing
+      if (environment === 'farcaster' || environment === 'baseapp') {
         try {
           // Try to import the SDK dynamically
           const { sdk } = await import('@farcaster/frame-sdk');
@@ -47,7 +79,7 @@ export function RetroSuccess({
           if (sdk?.actions && 'composeCast' in sdk.actions) {
             // @ts-ignore - we're checking for existence first, so this is safe
             await sdk.actions.composeCast({ text: shareText });
-            console.log("Opened share dialog in Warpcast with SDK");
+            console.log("Opened share dialog in Farcaster with SDK");
             return;
           }
         } catch (importError) {
@@ -55,21 +87,21 @@ export function RetroSuccess({
         }
         
         // Fall back to window.farcaster
-        if (window.farcaster?.actions && 'composeCast' in window.farcaster.actions) {
+        if ((window as any).farcaster?.actions && 'composeCast' in (window as any).farcaster.actions) {
           // @ts-ignore - we're checking for existence first, so this is safe
-          await window.farcaster.actions.composeCast({ text: shareText });
+          await (window as any).farcaster.actions.composeCast({ text: shareText });
           console.log("Opened share dialog using window.farcaster");
           return;
         }
       }
       
-      // Direct URL fallback if not in Warpcast environment
+      // Browser fallback - redirect to Farcaster
       window.open(`https://farcaster.com/~/compose?text=${encodeURIComponent(shareText)}`, '_blank');
     } catch (error) {
-      console.error("Error sharing to Warpcast:", error);
+      console.error("Error sharing to Farcaster:", error);
       // Fallback to copy to clipboard - also updated with mini app link
-      navigator.clipboard.writeText(`I just created ${tokenName} (${tokenSymbol}) on Base network using 8BitCoiner! 🚀\n\n${description}\n\nView on Zora: https://zora.co/coin/${contractAddress}\n\nCreate your own: https://warpcast.com/miniapps/VJFTWn45l8cA/8bitminter`);
-      alert("Share text copied to clipboard. You can paste it in Warpcast.");
+      navigator.clipboard.writeText(`I just created ${tokenName} (${tokenSymbol}) on Base network using 8BitCoiner! 🚀\n\n${description}\n\nView on Zora: https://zora.co/coin/${contractAddress}\n\nCreate your own: https://farcaster.com/miniapps/VJFTWn45l8cA/8bitminter`);
+      alert("Share text copied to clipboard. You can paste it in Farcaster.");
     }
   };
 
@@ -235,9 +267,9 @@ export function RetroSuccess({
         </RetroButton>
       </div>
 
-      {/* Share on Warpcast button spans full width */}
+      {/* Share on Farcaster button spans full width */}
       <RetroButton
-        onClick={shareOnWarpcast}
+        onClick={shareToken}
         variant="default"
         fullWidth
         className="bg-purple-600 hover:bg-purple-700 border-purple-500 flex justify-center" 
@@ -249,7 +281,17 @@ export function RetroSuccess({
           <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
           <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
         </svg>
-        SHARE ON FARCASTER
+        {(() => {
+          const environment = detectEnvironment();
+          switch (environment) {
+            case 'baseapp':
+              return 'SHARE ON BASEAPP';
+            case 'farcaster':
+              return 'SHARE ON FARCASTER';
+            default:
+              return 'SHARE ON FARCASTER';
+          }
+        })()}
       </RetroButton>
     </RetroStepScreen>
   );

@@ -36,7 +36,6 @@ export function detectEnvironment(): AppEnvironment {
 
   // Enhanced Farcaster detection
   const isFarcaster = (
-    userAgent.includes('warpcast') || 
     userAgent.includes('farcaster') ||
     (window as any).farcaster !== undefined ||
     // Check for Farcaster frame context

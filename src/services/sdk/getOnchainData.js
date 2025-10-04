@@ -1,6 +1,6 @@
 import { createPublicClient, http, formatEther } from "viem";
 import { base } from "viem/chains";
-import { getOnchainCoinDetails } from "@zoralabs/coins-sdk";
+import { getCoin, getOnchainCoinDetails } from "@zoralabs/coins-sdk";
 import { setApiKey } from "@zoralabs/coins-sdk";
 
 // Initialize API key for production environments
@@ -87,18 +87,31 @@ export const getOnchainTokenDetails = async (
 
   try {
     const publicClient = getPublicClient();
-
-    // Use Zora SDK to fetch coin data from blockchain
-    // Format according to SDK documentation
-    const params = {
-      coin: tokenAddress,
-      publicClient,
-      ...(userAddress ? { user: userAddress } : {}),
-    };
-
-    console.log("Fetching onchain details for:", tokenAddress);
-    const details = await getOnchainCoinDetails(params);
-    console.log("Raw onchain details received:", details);
+    
+    console.log("Fetching coin details for:", tokenAddress);
+    
+    // Use only Zora SDK's getOnchainCoinDetails as per documentation
+    console.log("=== CALLING ZORA getOnchainCoinDetails ===");
+    console.log("Parameters:", { coin: tokenAddress, publicClient, ...(userAddress && { user: userAddress }) });
+    
+    let details;
+    try {
+      details = await getOnchainCoinDetails({
+        coin: tokenAddress,
+        publicClient,
+        ...(userAddress && { user: userAddress })
+      });
+      
+      console.log("=== getOnchainCoinDetails SUCCESS ===");
+      console.log("Raw details from Zora SDK:", details);
+    } catch (error) {
+      console.error("=== getOnchainCoinDetails FAILED ===");
+      console.error("Error:", error);
+      console.error("This might mean the coin is not recognized by Zora yet or there's an API issue");
+      
+      // Coin Zora sisteminde henüz tanınmıyor olabilir
+      throw new Error(`Coin data unavailable from Zora: ${error.message}. The coin might not be ready for trading yet.`);
+    }
 
     // Format according to SDK documentation structure
     const tokenDetails = {
@@ -107,13 +120,13 @@ export const getOnchainTokenDetails = async (
       symbol: details.symbol || "???",
       decimals: details.decimals || 18,
       totalSupply: formatOnchainDetail(details.totalSupply),
-      pool: details.pool || "0x0000000000000000000000000000000000000000",
+      pool: details.pool ,
       owners: details.owners || [],
       ownersCount: details.owners?.length || 0,
       marketCap: formatOnchainDetail(details.marketCap),
       liquidity: formatOnchainDetail(details.liquidity),
       payoutRecipient:
-        details.payoutRecipient || "0x0000000000000000000000000000000000000000",
+        details.payoutRecipient,
       // Add user balance if available
       ...(details.balance
         ? {
@@ -124,6 +137,14 @@ export const getOnchainTokenDetails = async (
       fetchedAt: new Date().toISOString(),
       hasError: false,
     };
+
+    console.log("=== FORMATTED TOKEN DETAILS ===");
+    console.log("Name:", tokenDetails.name);
+    console.log("Symbol:", tokenDetails.symbol);  
+    console.log("Market Cap:", tokenDetails.marketCap);
+    console.log("Liquidity:", tokenDetails.liquidity);
+    console.log("Total Supply:", tokenDetails.totalSupply);
+    console.log("Raw details from Zora:", details);
 
     console.log("Formatted onchain token details:", tokenDetails);
     return tokenDetails;
@@ -140,7 +161,7 @@ export const getOnchainTokenDetails = async (
         raw: "0",
         formatted: "0",
       },
-      pool: "0x0000000000000000000000000000000000000000",
+      pool: details.pool,
       owners: [],
       ownersCount: 0,
       marketCap: {
@@ -151,7 +172,7 @@ export const getOnchainTokenDetails = async (
         raw: "0",
         formatted: "0",
       },
-      payoutRecipient: "0x0000000000000000000000000000000000000000",
+      payoutRecipient: details.payoutRecipient,
       fetchedAt: new Date().toISOString(),
       hasError: true,
       error: error.message,
