@@ -426,8 +426,8 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
   const getSellableBalance = useCallback((): bigint => {
     try {
       if (!isCreator()) return userTokenBalance;
-      const nonSellable = BigInt(CREATOR_NON_SELLABLE) * (10n ** 18n);
-      if (userTokenBalance <= nonSellable) return 0n;
+      const nonSellable = BigInt(CREATOR_NON_SELLABLE) * BigInt(10 ** 18);
+      if (userTokenBalance <= nonSellable) return BigInt(0);
       return userTokenBalance - nonSellable;
     } catch {
       return userTokenBalance;
