@@ -114,7 +114,7 @@ export function RetroTokenDetails({
         
         <RetroDivider text="Token Information" />
         
-        <div className="grid gap-5 mb-4">
+        <div className="grid gap-42mb-2">
           <div className="transform transition-all duration-300 hover:translate-x-1">
             <RetroInput
               label="Token Name"
@@ -123,7 +123,6 @@ export function RetroTokenDetails({
               placeholder="Enter a memorable name"
               className="bg-retro-darker/80 focus:bg-retro-darker transition-colors duration-300"
             />
-            <p className="text-xs text-retro-secondary mt-1 ml-1 italic">A unique and memorable name for your token</p>
           </div>
           
           <div className="transform transition-all duration-300 hover:translate-x-1">
@@ -135,7 +134,6 @@ export function RetroTokenDetails({
               maxLength={4}
               className="bg-retro-darker/80 focus:bg-retro-darker transition-colors duration-300"
             />
-            <p className="text-xs text-retro-secondary mt-1 ml-1 italic">Short identifier for exchanges (3-4 characters)</p>
           </div>
           
                       <div className="transform transition-all duration-300 hover:translate-x-1">
@@ -149,18 +147,10 @@ export function RetroTokenDetails({
                 rows={3}
                 className="w-full px-3 py-2 bg-retro-darker border-2 border-retro-primary text-white placeholder-retro-secondary/50 transition-colors duration-300 resize-none focus:outline-none focus:border-retro-accent focus:bg-retro-darker"
               />
-              <p className="text-xs text-retro-secondary mt-1 ml-1 italic">Brief description for your token (will be included in metadata)</p>
             </div>
         </div>
         
-        <div className="text-xs text-retro-accent mt-5 p-3 rounded-none border-2 border-retro-primary">
-          <div className="flex items-center mb-2">
-            <Info size={16} className="mr-2 text-retro-primary" />
-            <p className="font-semibold">Helpful Tips:</p>
-          </div>
-          <p className="ml-6 mb-1">• AI has suggested name, symbol and description</p>
-          <p className="ml-6">• You can modify these fields or keep the suggestions</p>
-        </div>
+     
       </RetroStepScreen>
       
       {/* Navigation buttons */}

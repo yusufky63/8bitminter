@@ -63,6 +63,15 @@ export function RetroMint({
 }: RetroMintProps) {
   const isDisabled = !isWalletReady;
   const [useCustomAmount, setUseCustomAmount] = useState(false);
+
+  // Primary action: if wallet is not ready, trigger connect; else create coin
+  const handlePrimaryAction = () => {
+    if (isWalletReady) {
+      onCreateCoin();
+    } else {
+      onConnect();
+    }
+  };
   
   // Handle percentage button click
   const handlePercentageClick = (percentage: number) => {
@@ -322,40 +331,14 @@ export function RetroMint({
           </span>
         </RetroButton>
         
-        {!isWalletReady ? (
-          <RetroButton
-            onClick={onConnect}
-            fullWidth
-          >
-            <span className="flex items-center justify-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="square"
-                strokeLinejoin="miter"
-                className="mr-2"
-              >
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-              </svg>
-              CONNECT WALLET
-            </span>
-          </RetroButton>
-        ) : (
-          <RetroButton
-            onClick={onCreateCoin}
-            fullWidth
-            isLoading={isLoading}
-            disabled={isDisabled}
-          >
-            CREATE TOKEN
-          </RetroButton>
-        )}
+        <RetroButton
+          onClick={handlePrimaryAction}
+          fullWidth
+          isLoading={isLoading}
+          disabled={isLoading}
+        >
+          CREATE COIN
+        </RetroButton>
       </div>
     </RetroStepScreen>
   );

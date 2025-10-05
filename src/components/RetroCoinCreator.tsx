@@ -3,7 +3,7 @@ import { useAccount, useConnect, useWalletClient, usePublicClient, useSwitchChai
 import { toast } from "react-hot-toast";
 import { parseEther } from "viem";
 import { base } from "viem/chains";
-import { detectEnvironment, getPreferredConnectorId, isWalletAvailable, getWalletAvailabilityMessage } from '../utils/wallet';
+import { detectEnvironment, getPreferredConnectorId, isWalletAvailable, getWalletAvailabilityMessage, isTrustedFarcasterHost, hasFarcasterRuntime, type AppEnvironment } from '../utils/wallet';
 import { runWalletDiagnostics, testWalletConnections } from '../utils/walletTest';
 
 // Retro components
@@ -107,6 +107,9 @@ export default function RetroCoinCreator() {
   const sdkInitialized = useRef(false);
   const farcasterSDK = useRef<FarcasterSDK | null>(null);
   const randomCategoryInitialized = useRef(false);
+  const [appEnv, setAppEnv] = useState<AppEnvironment>(() =>
+    typeof window !== 'undefined' ? detectEnvironment() : 'unknown'
+  );
   
   // Form state
   const [formData, setFormData] = useState<FormData>({
@@ -136,6 +139,7 @@ export default function RetroCoinCreator() {
   // Display states
   const [displayImageUrl, setDisplayImageUrl] = useState<string>("");
   const [contractAddress, setContractAddress] = useState<string>("");
+  const [autoCreateAfterConnect, setAutoCreateAfterConnect] = useState<boolean>(false);
   
   // Wallet connection
   const { address, isConnected } = useAccount();
@@ -144,11 +148,42 @@ export default function RetroCoinCreator() {
   const publicClient = usePublicClient();
   const { switchChain } = useSwitchChain();
   const isWalletReady = Boolean(isConnected && walletClient && publicClient);
+  const uiIsConnected = isConnected || appEnv === 'farcaster' || appEnv === 'baseapp';
+
+  // Create concise error messages for user-facing notifications
+  const simplifyErrorMessage = (raw: string) => {
+    const msg = (raw || '').toLowerCase();
+    if (msg.includes('not been authorized') || msg.includes('unauthorized') || msg.includes('not authorized')) {
+      return 'Authorization required in wallet.';
+    }
+    if (msg.includes('user rejected') || msg.includes('denied')) {
+      return 'Transaction cancelled by user.';
+    }
+    if (msg.includes('insufficient funds')) {
+      return 'Insufficient funds.';
+    }
+    if (msg.includes('chain mismatch') || (msg.includes('switch') && msg.includes('chain')) || msg.includes('wrong network')) {
+      return 'Wrong network. Switch to Base.';
+    }
+    if (msg.includes('network') || msg.includes('rpc')) {
+      return 'Network error. Try again.';
+    }
+    if (msg.includes('metadata')) {
+      return 'Invalid metadata URI.';
+    }
+    if (msg.includes('timeout')) {
+      return 'Request timed out.';
+    }
+    // fallback to first sentence, capped
+    const firstLine = raw.split('\n')[0] || raw;
+    return firstLine.length > 120 ? `${firstLine.slice(0, 117)}...` : firstLine;
+  };
 
   // Debug environment and connectors
   useEffect(() => {
-    const environment = detectEnvironment();
-    console.log('Current environment:', environment);
+    const env = detectEnvironment();
+    setAppEnv(env);
+    console.log('Current environment:', env);
     console.log('Available connectors:', connectors?.map(c => ({ id: c.id, name: c.name })));
     console.log('Wallet available:', isWalletAvailable());
     
@@ -159,14 +194,50 @@ export default function RetroCoinCreator() {
     if (process.env.NODE_ENV === 'development') {
       testWalletConnections();
     }
+
+    // Attempt silent auto-connect in Farcaster/BaseApp frames, only from trusted hosts and when runtime exists
+    try {
+      if ((env === 'farcaster' || env === 'baseapp') && isTrustedFarcasterHost() && hasFarcasterRuntime() && !isConnected && connectors && connectors.length > 0) {
+        // Prefer any connector that looks like Farcaster/Frame
+        const farcasterLike = connectors.find((c) =>
+          (c.id?.toLowerCase?.() || '').includes('farcaster') ||
+          (c.id?.toLowerCase?.() || '').includes('frame') ||
+          (c.name?.toLowerCase?.() || '').includes('farcaster') ||
+          (c.name?.toLowerCase?.() || '').includes('frame')
+        );
+
+        if (farcasterLike) {
+          try {
+            connect({ connector: farcasterLike });
+          } catch {
+            // swallow errors
+          }
+        }
+      }
+    } catch (_) {
+      // no-op; auto connect best-effort only
+    }
   }, [connectors]);
 
-  // Get ETH price in USD
+  // Get ETH price in USD with cache
+  const ethPriceCache: { value: number | null, timestamp: number } = { value: null, timestamp: 0 };
+  const CACHE_DURATION_MS = 60 * 1000; // 1 minute
+
   const fetchEthPrice = useCallback(async () => {
+    const now = Date.now();
+    if (
+      ethPriceCache.value !== null &&
+      now - ethPriceCache.timestamp < CACHE_DURATION_MS
+    ) {
+      setEthToUsdRate(ethPriceCache.value);
+      return;
+    }
     try {
       const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
       const data = await response.json();
       if (data && data.ethereum && data.ethereum.usd) {
+        ethPriceCache.value = data.ethereum.usd;
+        ethPriceCache.timestamp = now;
         setEthToUsdRate(data.ethereum.usd);
       }
     } catch (error) {
@@ -780,38 +851,27 @@ export default function RetroCoinCreator() {
         setStep(4);
       } catch (error) {
         console.error("Error creating coin:", error);
-        
-        // Normalize error message text for checks
-        const msg = (error instanceof Error ? error.message : String(error || "")).toLowerCase();
-        
-        // Handle user rejection/cancel cases with a short message
+        const raw = error instanceof Error ? error.message : String(error || '');
+        const msg = raw.toLowerCase();
+
+        // Short, user-friendly messages
         if (
-          msg.includes("user rejected") ||
-          msg.includes("user denied") ||
-          msg.includes("denied transaction") ||
-          msg.includes("request rejected") ||
-          msg.includes("rejected the request")
+          msg.includes('user rejected') ||
+          msg.includes('user denied') ||
+          msg.includes('denied transaction') ||
+          msg.includes('request rejected') ||
+          msg.includes('rejected the request')
         ) {
-          const shortMsg = "Transaction cancelled by user.";
+          const shortMsg = 'Transaction cancelled by user.';
           toast.error(shortMsg, { id: 'status-toast' });
           setError(shortMsg);
-        } else if (
-          error instanceof Error && (
-            msg.includes("insufficient funds") ||
-            msg.includes("exceeds the balance")
-          )
-        ) {
-          // Handle insufficient funds error
-          console.error("Insufficient funds for transaction:", error);
-          toast.error("Not enough ETH in your wallet for this transaction", {
-            id: 'status-toast'
-          });
-          setError(`Failed to create coin: Insufficient funds. Please make sure you have enough ETH (at least ${selectedPurchaseAmount} ETH plus gas).`);
+        } else if (msg.includes('insufficient funds') || msg.includes('exceeds the balance')) {
+          toast.error('Insufficient funds.', { id: 'status-toast' });
+          setError('Insufficient funds.');
         } else {
-          // General fallback (keep concise but informative)
-          const generic = error instanceof Error ? error.message : "Unknown error";
-          toast.error(`Failed to create coin: ${generic}`, { id: 'status-toast' });
-          setError(`Failed to create coin: ${generic}`);
+          const concise = simplifyErrorMessage(raw);
+          toast.error(concise, { id: 'status-toast' });
+          setError(concise);
         }
     } finally {
       setIsLoading(false);
@@ -829,21 +889,35 @@ export default function RetroCoinCreator() {
         const environment = detectEnvironment();
         const message = getWalletAvailabilityMessage(environment);
         setError(message);
+        toast.error(message, { id: 'status-toast' });
+        setAutoCreateAfterConnect(false);
         return;
       }
       
       if (!connectors || connectors.length === 0) {
         console.error("No connectors available");
         setError("Wallet connection is not available. Please ensure you're using a supported app.");
+        toast.error("Wallet connection is not available. Please ensure you're using a supported app.", { id: 'status-toast' });
+        setAutoCreateAfterConnect(false);
         return;
       }
+
+      // Prevent attempting Farcaster connect in untrusted embedded frames (dev tunnels)
+      const envForConnect = detectEnvironment();
+      if (envForConnect === 'farcaster' && !isTrustedFarcasterHost()) {
+        const isEmbedded = typeof window !== 'undefined' && (window as any).top !== window;
+        if (isEmbedded) {
+          const msg = 'Wallet connect is blocked in this embedded view. Open the app in your browser or the official Farcaster app.';
+          setError(msg);
+          toast.error(msg, { id: 'status-toast', duration: 6000 });
+          setAutoCreateAfterConnect(false);
+          return;
+        }
+      }
       
-      // Check current connection first
+      // If already connected, no need to trigger connect again
       if (isConnected && address) {
         console.log("Already connected with address:", address);
-        toast.success(`Already connected: ${address.substring(0, 6)}...${address.substring(38)}`, {
-          id: 'status-toast'
-        });
         return;
       }
       
@@ -855,25 +929,77 @@ export default function RetroCoinCreator() {
       
       // Find the best connector for the environment
       let targetConnector = connectors[0]; // Default fallback
-      
-      const preferredConnector = connectors.find(connector => 
-        connector.id === preferredConnectorId || 
-        connector.id.includes(preferredConnectorId) ||
-        (preferredConnectorId === 'injected' && connector.name?.toLowerCase().includes('injected'))
-      );
-      
+
+      const preferredConnector = connectors.find((connector) => {
+        const id = (connector.id || '').toLowerCase();
+        const name = (connector.name || '').toLowerCase();
+        const pref = (preferredConnectorId || '').toLowerCase();
+        if (pref === 'injected') {
+          return id.includes('injected') || name.includes('injected') || name.includes('metamask');
+        }
+        // Fuzzy match for Farcaster/frame connectors
+        return (
+          id === pref ||
+          id.includes(pref) ||
+          pref.includes(id) ||
+          name.includes(pref) ||
+          id.includes('farcaster') || name.includes('farcaster') ||
+          id.includes('frame') || name.includes('frame')
+        );
+      });
+
       if (preferredConnector) {
         targetConnector = preferredConnector;
         console.log(`Using ${preferredConnector.name} connector for ${environment}`);
       } else {
         console.log(`Preferred connector ${preferredConnectorId} not found, using default`);
       }
-      
-      await connect({ connector: targetConnector });
-      
-      toast.success("Wallet connection initiated.", {
-        id: 'status-toast'
-      });
+
+      // In Farcaster env but untrusted host (e.g., tunnel), force injected fallback
+      if (environment === 'farcaster' && !isTrustedFarcasterHost()) {
+        const injectedFallback = connectors.find((c) =>
+          (c.id?.toLowerCase?.() || '').includes('injected') ||
+          (c.name?.toLowerCase?.() || '').includes('metamask')
+        );
+        if (injectedFallback) {
+          targetConnector = injectedFallback;
+          console.log('Untrusted Farcaster host detected; falling back to injected connector');
+        }
+      }
+
+      // If Farcaster env but runtime is missing (hasSDK/hasFarcasterWindow false), prefer injected
+      if (environment === 'farcaster' && !hasFarcasterRuntime()) {
+        const injectedFallback = connectors.find((c) =>
+          (c.id?.toLowerCase?.() || '').includes('injected') ||
+          (c.name?.toLowerCase?.() || '').includes('metamask')
+        );
+        if (injectedFallback) {
+          targetConnector = injectedFallback;
+          console.log('Farcaster runtime not detected; falling back to injected connector');
+        }
+      }
+
+      // Try connecting; on origin mismatch, fallback to injected if available
+      try {
+        await connect({ connector: targetConnector });
+      } catch (err) {
+        const msg = (err instanceof Error ? err.message : String(err || ''))?.toLowerCase?.() || '';
+        const isOriginMismatch = msg.includes('origin') || msg.includes("origins don't match");
+        if (isOriginMismatch) {
+          const injectedFallback = connectors.find((c) =>
+            (c.id?.toLowerCase?.() || '').includes('injected') ||
+            (c.name?.toLowerCase?.() || '').includes('metamask')
+          );
+          if (injectedFallback) {
+            console.warn('Connector origin mismatch; retrying with injected connector');
+            await connect({ connector: injectedFallback });
+          } else {
+            throw err;
+          }
+        } else {
+          throw err;
+        }
+      }
       
     } catch (error) {
       console.error("Error connecting wallet:", error);
@@ -891,7 +1017,7 @@ export default function RetroCoinCreator() {
             userMessage = "BaseApp wallet not available. Please ensure you're using the latest version of BaseApp.";
             break;
           case 'farcaster':
-            userMessage = "Farcaster wallet not available. Please ensure you're using Farcaster app.";
+            userMessage = "Farcaster wallet not available. Please ensure you're using Farcaster app or try a browser wallet.";
             break;
           case 'browser':
             userMessage = "No wallet found. Please install MetaMask or another Ethereum wallet.";
@@ -912,8 +1038,27 @@ export default function RetroCoinCreator() {
         id: 'status-toast',
         duration: 5000
       });
+      setAutoCreateAfterConnect(false);
     }
   };
+
+  // Connect and schedule automatic create on success
+  const connectThenCreate = async () => {
+    setAutoCreateAfterConnect(true);
+    toast.loading('Connecting wallet...', { id: 'status-toast' });
+    await connectWallet();
+  };
+
+  // When connection becomes ready and auto-create is requested, proceed
+  useEffect(() => {
+    if (autoCreateAfterConnect && isWalletReady) {
+      setAutoCreateAfterConnect(false);
+      // Proceed to create after a small tick to allow UI to update
+      setTimeout(() => {
+        handleCreateCoin();
+      }, 100);
+    }
+  }, [autoCreateAfterConnect, isWalletReady]);
 
   // Calculate USD value
   const formattedUsdValue = (parseFloat(selectedPurchaseAmount) * ethToUsdRate).toFixed(2);
@@ -1020,6 +1165,28 @@ export default function RetroCoinCreator() {
             console.log("Calling SDK ready...");
             await farcasterSDK.current.actions.ready();
             console.log("âœ… Farcaster SDK ready");
+
+            // After SDK ready in Farcaster/BaseApp, try silent connect again
+            try {
+              const envNow = detectEnvironment();
+              if ((envNow === 'farcaster' || envNow === 'baseapp') && !isConnected && connectors && connectors.length > 0) {
+                const farcasterLike = connectors.find((c) =>
+                  (c.id?.toLowerCase?.() || '').includes('farcaster') ||
+                  (c.id?.toLowerCase?.() || '').includes('frame') ||
+                  (c.name?.toLowerCase?.() || '').includes('farcaster') ||
+                  (c.name?.toLowerCase?.() || '').includes('frame')
+                );
+                if (farcasterLike) {
+                  try {
+                    connect({ connector: farcasterLike });
+                  } catch {
+                    // swallow errors
+                  }
+                }
+              }
+            } catch (_) {
+              // best-effort only
+            }
           }
           
           // Set initialized flag
@@ -1085,7 +1252,7 @@ export default function RetroCoinCreator() {
       {step === 0 && (
         <RetroIntro 
           onGetStarted={() => setStep(1)}
-          isWalletConnected={isConnected}
+          isWalletConnected={isConnected || appEnv === 'farcaster' || appEnv === 'baseapp'}
           onConnectWallet={connectWallet}
         />
       )}
@@ -1131,7 +1298,7 @@ export default function RetroCoinCreator() {
           isCustomAmount={isCustomAmount}
           ownersAddresses={ownersAddresses}
           newOwnerAddress={newOwnerAddress}
-          isConnected={isConnected}
+          isConnected={uiIsConnected}
           isLoading={isLoading}
           isWalletReady={isWalletReady}
           selectedCurrency={selectedCurrency}
@@ -1141,7 +1308,7 @@ export default function RetroCoinCreator() {
           onNewOwnerAddressChange={setNewOwnerAddress}
           onAddOwner={addOwnerAddress}
           onRemoveOwner={removeOwnerAddress}
-          onConnect={connectWallet}
+          onConnect={connectThenCreate}
           onCreateCoin={handleCreateCoin}
           onBack={() => setStep(2)}
           onCurrencyChange={handleCurrencyChange}

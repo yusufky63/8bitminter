@@ -113,7 +113,7 @@ export function RetroCategories({
       <RetroStepScreen
         title="DEFINE YOUR RETRO TOKEN"
         hideButtons={true} // Hide default buttons, we'll use our own
-        className="mb-3"
+        className="mb-2"
       >
         
         
@@ -129,7 +129,7 @@ export function RetroCategories({
         
         {/* Show category details when a category is selected */}
         {category && selectedCategory && (
-          <div className="mt-3 mb-4 border-2 border-retro-primary p-2 font-mono">
+          <div className="mt-3 mb-1 border-2 border-retro-primary p-2 font-mono">
             <div className="flex justify-between items-center mb-2">
               <h3 className="text-retro-accent font-bold pixelated text-sm">{selectedCategory.name}</h3>
               <button 

@@ -34,12 +34,14 @@ export function detectEnvironment(): AppEnvironment {
     return 'baseapp';
   }
 
-  // Enhanced Farcaster detection
+  // Enhanced Farcaster detection (only treat as Farcaster if host is trusted)
   const isFarcaster = (
-    userAgent.includes('farcaster') ||
-    (window as any).farcaster !== undefined ||
-    // Check for Farcaster frame context
-    (window as any).top !== window && (window as any).parent?.postMessage
+    (
+      userAgent.includes('farcaster') ||
+      (window as any).farcaster !== undefined ||
+      // Check for embedded frame context
+      ((window as any).top !== window && (window as any).parent?.postMessage)
+    ) && isTrustedFarcasterHost()
   );
 
   if (isFarcaster) {
@@ -63,7 +65,8 @@ export function getPreferredConnectorId(environment: AppEnvironment): string {
     case 'browser':
       return 'injected';
     case 'farcaster':
-      return 'farcasterFrame';
+      // Connector id varies by package version; prefer a generic hint
+      return 'farcaster';
     default:
       return 'injected'; // fallback
   }
@@ -173,4 +176,25 @@ export async function getFarcasterUserContext(): Promise<{
     console.error('Error getting Farcaster context:', error);
     return null;
   }
+}
+
+/**
+ * Returns true if the current frame appears to be embedded by a trusted
+ * Farcaster host (e.g., farcaster.xyz / warpcast.com). Used to avoid
+ * attempting Farcaster-specific connectors when running in generic iframes
+ * during development (e.g., cloudflare tunnels).
+ */
+export function isTrustedFarcasterHost(): boolean {
+  if (typeof document === 'undefined') return false;
+  const ref = document.referrer?.toLowerCase?.() || '';
+  return ref.includes('farcaster') || ref.includes('warpcast.com');
+}
+
+/**
+ * Detects whether Farcaster runtime/SDK is available in the page
+ */
+export function hasFarcasterRuntime(): boolean {
+  if (typeof window === 'undefined') return false;
+  const w: any = window as any;
+  return !!(w.farcaster || w.sdk);
 }

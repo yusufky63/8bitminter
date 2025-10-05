@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useAccount } from "wagmi";
 import { detectEnvironment, getBaseAppContext, getFarcasterUserContext } from '../utils/wallet';
 
 interface HeaderProps {
@@ -20,6 +21,7 @@ export default function RetroHeader({
 }: HeaderProps) {
   const [currentTab, setCurrentTab] = useState(activeTab);
   const [userInfo, setUserInfo] = useState<UserInfo>({});
+  const { address, isConnected } = useAccount();
 
   // Fetch user info based on environment
   useEffect(() => {
@@ -86,14 +88,20 @@ export default function RetroHeader({
                 8BitCoiner
               </h1>
             </div>
-            {userInfo.name && (
+            <div className="flex items-center gap-2">
+              {userInfo.name && (
+                <div className="text-xs text-retro-accent px-2 py-1 border border-retro-primary rounded">
+                  <span className="opacity-70">
+                    {userInfo.type === 'basename' ? 'BASE:' : 
+                     userInfo.type === 'farcaster' ? 'FC:' : ''}
+                  </span> {userInfo.name}
+                </div>
+              )}
               <div className="text-xs text-retro-accent px-2 py-1 border border-retro-primary rounded">
-                <span className="opacity-70">
-                  {userInfo.type === 'basename' ? 'BASE:' : 
-                   userInfo.type === 'farcaster' ? 'FC:' : ''}
-                </span> {userInfo.name}
+                <span className="opacity-70 mr-1">WALLET:</span>
+                {isConnected && address ? `${address.substring(0, 3)}...${address.substring(address.length - 2)}` : 'NOT CONNECTED'}
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>
