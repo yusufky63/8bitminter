@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import App from "./app";
+import { sdk as miniAppSdk } from "@farcaster/miniapp-sdk";
 import { FrameContext, initializeFarcaster } from "./mini-app";
 
 export default function Home() {
@@ -32,6 +33,21 @@ export default function Home() {
             console.log("Notification details available:", !!contextData.client.notificationDetails);
           }
           
+          // If mini-app is not yet added, try to trigger add-miniapp flow
+          try {
+            if (contextData.client && (contextData.client as any).added === false) {
+              const actions: any = (miniAppSdk as any)?.actions;
+              const addFn = actions?.addMiniApp || actions?.addMiniapp || actions?.add;
+              if (typeof addFn === 'function') {
+                console.log("Attempting to trigger add-miniapp action...");
+                addFn().catch(() => {/* no-op */});
+              }
+            }
+          } catch (e) {
+            // best effort only
+            console.debug('add-miniapp action not available', e);
+          }
+
           // Check manifest access to verify setup
           try {
             const response = await fetch('/.well-known/farcaster.json');
