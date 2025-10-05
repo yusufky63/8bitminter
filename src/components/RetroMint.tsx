@@ -20,6 +20,7 @@ interface RetroMintProps {
   newOwnerAddress: string;
   isConnected: boolean;
   isLoading: boolean;
+  isWalletReady?: boolean;
   selectedCurrency: number;
   onPurchaseToggle: () => void;
   onPercentageChange: (percentage: number) => void;
@@ -47,6 +48,7 @@ export function RetroMint({
   newOwnerAddress,
   isConnected,
   isLoading,
+  isWalletReady = false,
   selectedCurrency,
   onPurchaseToggle,
   onPercentageChange,
@@ -59,7 +61,7 @@ export function RetroMint({
   onBack,
   onCurrencyChange
 }: RetroMintProps) {
-  const isDisabled = !isConnected;
+  const isDisabled = !isWalletReady;
   const [useCustomAmount, setUseCustomAmount] = useState(false);
   
   // Handle percentage button click
@@ -141,35 +143,7 @@ export function RetroMint({
         {/* Add description section */}
      
         
-        <RetroDivider text="CURRENCY SELECTION" />
-        
-        <div className="mb-4">
-          <label className="retro-label mb-2">SELECT TRADING CURRENCY</label>
-          <div className="grid grid-cols-2 gap-2">
-            <RetroButton
-              onClick={() => onCurrencyChange(2)} // ETH
-              className={`text-sm ${selectedCurrency === 2 ? 'bg-retro-primary text-retro-dark' : 'bg-transparent border border-retro-primary text-retro-accent'}`}
-            >
-              ETH/WETH
-            </RetroButton>
-            
-            <RetroButton
-              onClick={() => onCurrencyChange(1)} // ZORA
-                              className={`text-sm ${selectedCurrency === 1 ? 'bg-retro-primary text-retro-dark' : 'bg-transparent border border-retro-primary text-retro-accent'}`}
-            >
-              ZORA TOKEN
-            </RetroButton>
-          </div>
-          
-          <div className="text-xs text-retro-secondary mt-2 p-2 border border-retro-primary/30">
-            <p className="mb-1">
-              <span className="text-retro-primary">ETH/WETH:</span> Most common, uses Ethereum as trading currency
-            </p>
-            <p>
-              <span className="text-retro-primary">ZORA TOKEN:</span> Uses ZORA tokens for trading
-            </p>
-          </div>
-        </div>
+        {/* Currency selection removed per requirements; default currency is used */}
         
         <RetroDivider text="PURCHASE SETTINGS" />
         
@@ -348,7 +322,7 @@ export function RetroMint({
           </span>
         </RetroButton>
         
-        {!isConnected ? (
+        {!isWalletReady ? (
           <RetroButton
             onClick={onConnect}
             fullWidth
@@ -369,7 +343,7 @@ export function RetroMint({
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                 <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
               </svg>
-              CONNECT WITH FARCASTER
+              CONNECT WALLET
             </span>
           </RetroButton>
         ) : (

@@ -148,10 +148,7 @@ export function RetroCategories({
                 <div className="mb-2">
                   <span className="text-retro-secondary">THEMES:</span> {selectedCategory.themes}
                 </div>
-                <RetroDivider text="EXAMPLE" />
-                <div className="p-2 bg-retro-darker mb-2 border border-retro-primary">
-                  {getCategoryExample(selectedCategory.name)}
-                </div>
+                {/* EXAMPLE section removed per request */}
               </div>
             )}
           </div>

@@ -7,7 +7,7 @@ import { validateTradeBalance } from "../services/sdk/getTradeCoin.js";
 import { toast } from "react-hot-toast";
 import CoinDetails from "./RetroCoinDetails";
 import { resolveImageUrl } from "../utils/ipfs";
-import { Camera } from "lucide-react";
+import { Camera, LayoutGrid, List } from "lucide-react";
 import { RetroTokenCard, type RetroToken } from "./RetroTokenCard";
 
 interface TokenBalance {
@@ -129,6 +129,7 @@ export default function CoinHolderView() {
   const [sortBy, setSortBy] = useState<"balance" | "marketCap" | "holders" | "volume" | "name" | "usdValue">("usdValue");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [ethToUsdRate, setEthToUsdRate] = useState<number>(3000); // Add ETH price state
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -598,7 +599,7 @@ export default function CoinHolderView() {
   return (
     <div className="retro-container p-2 border-2 border-retro-primary">
       {/* Header with enhanced styling */}
-      <div className="mb-4 bg-gradient-to-r from-retro-primary/20 to-retro-primary/5 p-3 border-2 border-retro-primary shadow-[0_0_10px_rgba(255,107,53,0.1)]">
+      <div className="mb-2 bg-gradient-to-r from-retro-primary/20 to-retro-primary/5 p-3 border-2 border-retro-primary shadow-[0_0_10px_rgba(255,107,53,0.1)]">
         <h2 className="retro-header text-sm mb-0 text-retro-primary font-bold pixelated flex items-center">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
@@ -611,7 +612,7 @@ export default function CoinHolderView() {
       </div>
       
       {/* Profile section with modern retro design */}
-      <div className="mb-4">
+      <div className="mb-2">
         {isConnected ? (
           <>
             {isProfileLoading ? (
@@ -809,7 +810,26 @@ export default function CoinHolderView() {
           <p className="text-retro-secondary text-xs pixelated">LOADING PORTFOLIO...</p>
         </div>
       ) : tokens.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        <div>
+          <div className="flex justify-end gap-2 mb-2">
+            <RetroButton
+              onClick={() => setViewMode('grid')}
+              className={`text-xs p-2 ${viewMode==='grid' ? 'bg-retro-primary text-retro-dark' : ''}`}
+              aria-label="Grid view"
+              title="Grid view"
+            >
+              <LayoutGrid size={16} />
+            </RetroButton>
+            <RetroButton
+              onClick={() => setViewMode('list')}
+              className={`text-xs p-2 ${viewMode==='list' ? 'bg-retro-primary text-retro-dark' : ''}`}
+              aria-label="List view"
+              title="List view"
+            >
+              <List size={16} />
+            </RetroButton>
+          </div>
+          <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-2' : 'space-y-2'}>
           {tokens.map((t) => {
             const mapped: RetroToken = {
               address: t.address,
@@ -821,9 +841,10 @@ export default function CoinHolderView() {
               holders: t.holders,
             };
             return (
-              <RetroTokenCard key={t.address} token={mapped} onClick={(addr) => handleTokenClick(addr)} />
+              <RetroTokenCard key={t.address} token={mapped} onClick={(addr) => handleTokenClick(addr)} variant={viewMode === 'grid' ? 'card' : 'list'} />
             );
           })}
+          </div>
         </div>
       ) : (
         <div className="text-center py-8 border-2 border-retro-primary bg-gradient-to-br from-retro-primary/5 to-black/40">

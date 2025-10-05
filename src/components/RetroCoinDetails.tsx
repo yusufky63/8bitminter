@@ -190,6 +190,12 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
   const [activeTab, setActiveTab] = useState<"details" | "trade" | "analysis">(
     "details"
   );
+  const ZORA_REFERRER = '0xbFA6A45Dd534d39dF47A3F3D2f2b6E88416f9831';
+  const openOnZora = () => {
+    if (!tokenDetails?.address) return;
+    window.open(`https://zora.co/coin/base:${tokenDetails.address}?referrer=${ZORA_REFERRER}`, '_blank');
+  };
+  const isWalletReady = Boolean(isConnected && walletClient && publicClient);
 
   // Calculate Token Score
   const calculateTokenScore = useCallback(
@@ -657,14 +663,8 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
 
   // Handle trade click with updated Zora SDK implementation
   const handleTradeClick = async () => {
-    if (!tokenDetails || !isConnected || !publicClient || !walletClient || !address) {
-      if (!isConnected) {
-        toast.error("Please connect your wallet first");
-      } else if (!publicClient) {
-        toast.error("Public client not ready");
-      } else if (!walletClient) {
-        toast.error("Wallet client not ready");
-      }
+    if (!tokenDetails || !isWalletReady || !address) {
+      toast.error("Connect your wallet to trade");
       return;
     }
 
@@ -1359,13 +1359,18 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
               </div>
             </div>
             {tokenDetails.creator.profileName && (
-              <div className="mt-2 flex items-center">
-                <span className="text-xs text-retro-secondary mr-1">
-                  Created by:
-                </span>
-                <span className="text-xs text-retro-accent  px-2 py-0.5  border border-retro-primary">
-                  @{tokenDetails.creator.profileName}
-                </span>
+              <div className="mt-2 flex items-center justify-between">
+                <div className="flex items-center">
+                  <span className="text-xs text-retro-secondary mr-1">
+                    Created by:
+                  </span>
+                  <span className="text-xs text-retro-accent px-2 py-0.5 border border-retro-primary">
+                    @{tokenDetails.creator.profileName}
+                  </span>
+                </div>
+                <RetroButton onClick={openOnZora} className="text-[10px] py-1 px-2 whitespace-nowrap">
+                  VIEW ON ZORA
+                </RetroButton>
               </div>
             )}
           </div>
@@ -2005,7 +2010,7 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
                 </div>
               </div>
 
-              {isConnected ? (
+              {isWalletReady ? (
                 <RetroButton
                   onClick={handleTradeClick}
                   isLoading={isTrading}

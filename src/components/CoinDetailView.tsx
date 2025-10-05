@@ -38,7 +38,8 @@ export function CoinDetailView({ coin, onBack }: { coin: any; onBack: () => void
   };
 
   const openZora = () => {
-    window.open(`https://zora.co/coin/${coin.contract_address}`, '_blank');
+    const referrer = '0xbFA6A45Dd534d39dF47A3F3D2f2b6E88416f9831';
+    window.open(`https://zora.co/coin/base:${coin.contract_address}?referrer=${referrer}`, '_blank');
   };
 
   const openCreatorBasescan = () => {
@@ -92,7 +93,7 @@ export function CoinDetailView({ coin, onBack }: { coin: any; onBack: () => void
             {/* Quick Actions */}
             <div className="grid grid-cols-2 gap-4">
               <RetroButton onClick={openZora} className="w-full">
-                🚀 Trade on Zora
+                🔗 View on Zora
               </RetroButton>
               <RetroButton onClick={openBasescan} variant="outline" className="w-full">
                 📊 View on Basescan

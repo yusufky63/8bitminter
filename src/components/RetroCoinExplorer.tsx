@@ -31,6 +31,8 @@ import {
   ChevronDown,
   ArrowLeft,
   Search,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 
 // Declare global types for Farcaster
@@ -112,6 +114,7 @@ export default function RetroCoinExplorer({
   const [activeFilter, setActiveFilter] = useState<FilterType>(initialFilter);
   const [viewingDetails, setViewingDetails] = useState(false);
   const [selectedTokenAddress, setSelectedTokenAddress] = useState<string>("");
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   // UI states - unified search
   const [searchTerm, setSearchTerm] = useState("");
@@ -685,7 +688,7 @@ export default function RetroCoinExplorer({
               }`}
             >
               <Home size={18} />
-              <span>Our Coins</span>
+              <span>Platform Coins</span>
               <span className="text-xs bg-retro-darker/30 px-2 py-1 rounded">
                 {localCoins.length}
               </span>
@@ -700,7 +703,7 @@ export default function RetroCoinExplorer({
               }`}
             >
               <BarChart3 size={18} />
-              <span>All Coins</span>
+              <span> All Coins</span>
             </button>
           </div>
 
@@ -878,7 +881,26 @@ export default function RetroCoinExplorer({
 
         {/* Market data tokens list */}
         {!isLoading && !tokenDetails && tokensData.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-6">
+          <>
+            <div className="flex justify-end gap-2 mb-2">
+              <RetroButton
+                onClick={() => setViewMode('grid')}
+                className={`text-xs p-2 ${viewMode==='grid' ? 'bg-retro-primary text-retro-dark' : ''}`}
+                aria-label="Grid view"
+                title="Grid view"
+              >
+                <LayoutGrid size={16} />
+              </RetroButton>
+              <RetroButton
+                onClick={() => setViewMode('list')}
+                className={`text-xs p-2 ${viewMode==='list' ? 'bg-retro-primary text-retro-dark' : ''}`}
+                aria-label="List view"
+                title="List view"
+              >
+                <List size={16} />
+              </RetroButton>
+            </div>
+            <div className={viewMode === 'grid' ? 'grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-2 gap-2 mb-6' : 'space-y-2 mb-6'}>
             {getCurrentTokens()
               .filter(
                 (token) =>
@@ -901,10 +923,11 @@ export default function RetroCoinExplorer({
                   currency: 'ETH',
                 };
                 return (
-                  <RetroTokenCard key={t.address || `token-${index}`} token={mapped} onClick={handleViewDetails} />
+                  <RetroTokenCard key={t.address || `token-${index}`} token={mapped} onClick={handleViewDetails} variant={viewMode === 'grid' ? 'card' : 'list'} />
                 );
               })}
-          </div>
+            </div>
+          </>
         )}
         {/* Debug info for development */}
     
@@ -1010,7 +1033,26 @@ export default function RetroCoinExplorer({
         {/* Results info */}
 
         {/* Coins list */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-2">
+        <div className="mb-2">
+          <div className="flex justify-end gap-2 mb-2">
+            <RetroButton
+              onClick={() => setViewMode('grid')}
+              className={`text-xs p-2 ${viewMode==='grid' ? 'bg-retro-primary text-retro-dark' : ''}`}
+              aria-label="Grid view"
+              title="Grid view"
+            >
+              <LayoutGrid size={16} />
+            </RetroButton>
+            <RetroButton
+              onClick={() => setViewMode('list')}
+              className={`text-xs p-2 ${viewMode==='list' ? 'bg-retro-primary text-retro-dark' : ''}`}
+              aria-label="List view"
+              title="List view"
+            >
+              <List size={16} />
+            </RetroButton>
+          </div>
+          <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-2' : 'space-y-2'}>
           {currentLocalCoins.map((t) => {
             const mapped: RetroToken = {
               address: t.address,
@@ -1025,9 +1067,10 @@ export default function RetroCoinExplorer({
               currency: 'ETH',
             };
             return (
-              <RetroTokenCard key={t.address} token={mapped} onClick={handleViewDetails} />
+              <RetroTokenCard key={t.address} token={mapped} onClick={handleViewDetails} variant={viewMode === 'grid' ? 'card' : 'list'} />
             );
           })}
+          </div>
         </div>
 
         {/* Pagination */}

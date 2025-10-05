@@ -106,6 +106,7 @@ export default function RetroCoinCreator() {
   const [isContentReady, setIsContentReady] = useState(false);
   const sdkInitialized = useRef(false);
   const farcasterSDK = useRef<FarcasterSDK | null>(null);
+  const randomCategoryInitialized = useRef(false);
   
   // Form state
   const [formData, setFormData] = useState<FormData>({
@@ -122,7 +123,7 @@ export default function RetroCoinCreator() {
   const [userEthBalance, setUserEthBalance] = useState<bigint>(BigInt(0));
   const [ethToUsdRate, setEthToUsdRate] = useState<number>(0);
   const [isCustomAmount, setIsCustomAmount] = useState<boolean>(false);
-  const [isPurchaseEnabled, setIsPurchaseEnabled] = useState<boolean>(true);
+  const [isPurchaseEnabled, setIsPurchaseEnabled] = useState<boolean>(false);
   const [ownersAddresses, setOwnersAddresses] = useState<string[]>([]);
   const [newOwnerAddress, setNewOwnerAddress] = useState<string>("");
   const [selectedCurrency, setSelectedCurrency] = useState<number>(DeployCurrency.ZORA);
@@ -142,6 +143,7 @@ export default function RetroCoinCreator() {
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
   const { switchChain } = useSwitchChain();
+  const isWalletReady = Boolean(isConnected && walletClient && publicClient);
 
   // Debug environment and connectors
   useEffect(() => {
@@ -779,10 +781,26 @@ export default function RetroCoinCreator() {
       } catch (error) {
         console.error("Error creating coin:", error);
         
-      // Handle different error types
-        if (error instanceof Error && 
-          (error.message.includes("insufficient funds") || 
-           error.message.includes("exceeds the balance"))) {
+        // Normalize error message text for checks
+        const msg = (error instanceof Error ? error.message : String(error || "")).toLowerCase();
+        
+        // Handle user rejection/cancel cases with a short message
+        if (
+          msg.includes("user rejected") ||
+          msg.includes("user denied") ||
+          msg.includes("denied transaction") ||
+          msg.includes("request rejected") ||
+          msg.includes("rejected the request")
+        ) {
+          const shortMsg = "Transaction cancelled by user.";
+          toast.error(shortMsg, { id: 'status-toast' });
+          setError(shortMsg);
+        } else if (
+          error instanceof Error && (
+            msg.includes("insufficient funds") ||
+            msg.includes("exceeds the balance")
+          )
+        ) {
           // Handle insufficient funds error
           console.error("Insufficient funds for transaction:", error);
           toast.error("Not enough ETH in your wallet for this transaction", {
@@ -790,11 +808,10 @@ export default function RetroCoinCreator() {
           });
           setError(`Failed to create coin: Insufficient funds. Please make sure you have enough ETH (at least ${selectedPurchaseAmount} ETH plus gas).`);
         } else {
-          // For other errors, show a general error message
-        toast.error(`Failed to create coin: ${error instanceof Error ? error.message : "Unknown error"}`, {
-            id: 'status-toast'
-          });
-          setError(`Failed to create coin: ${error instanceof Error ? error.message : "Unknown error"}`);
+          // General fallback (keep concise but informative)
+          const generic = error instanceof Error ? error.message : "Unknown error";
+          toast.error(`Failed to create coin: ${generic}`, { id: 'status-toast' });
+          setError(`Failed to create coin: ${generic}`);
         }
     } finally {
       setIsLoading(false);
@@ -908,8 +925,15 @@ export default function RetroCoinCreator() {
 
   // Reset form for creating another token
   const resetForm = () => {
+    // Choose a random category again on reset so user isn't forced to pick
+    let randomCategoryName = "";
+    if (categories && categories.length > 0) {
+      const random = categories[Math.floor(Math.random() * categories.length)];
+      randomCategoryName = random?.name || "";
+    }
+
     setFormData({
-      category: "",
+      category: randomCategoryName,
       description: "",
       name: "",
       symbol: "",
@@ -923,16 +947,26 @@ export default function RetroCoinCreator() {
     setSelectedPurchasePercentage(10);
     setSelectedPurchaseAmount("0.01");
     setIsCustomAmount(false);
-    setIsPurchaseEnabled(true);
+    setIsPurchaseEnabled(false);
     setOwnersAddresses([]);
     setSelectedCurrency(DeployCurrency.ZORA); // Reset to SDK default on Base
     setPlatformReferrer(""); // Reset platform referrer
+    // Mark random category as initialized to avoid override in effect
+    randomCategoryInitialized.current = !!randomCategoryName;
   };
 
   // Initialize SDK and set up application
   useEffect(() => {
-    // Load categories
-    setCategories(getCoinCategories());
+    // Load categories and pick a random default category once
+    const cats = getCoinCategories();
+    setCategories(cats);
+    if (!randomCategoryInitialized.current && cats && cats.length > 0) {
+      const random = cats[Math.floor(Math.random() * cats.length)];
+      if (random?.name) {
+        setFormData(prev => ({ ...prev, category: random.name }));
+        randomCategoryInitialized.current = true;
+      }
+    }
     
     // Set content ready flag when initial data is loaded
     setIsContentReady(true);
@@ -1099,6 +1133,7 @@ export default function RetroCoinCreator() {
           newOwnerAddress={newOwnerAddress}
           isConnected={isConnected}
           isLoading={isLoading}
+          isWalletReady={isWalletReady}
           selectedCurrency={selectedCurrency}
           onPurchaseToggle={() => setIsPurchaseEnabled(!isPurchaseEnabled)}
           onPercentageChange={setPredefinedAmount}

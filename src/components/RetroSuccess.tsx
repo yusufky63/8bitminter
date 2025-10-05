@@ -27,16 +27,19 @@ export function RetroSuccess({
     navigator.clipboard.writeText(contractAddress);
   };
 
-  // Open coin on Zora
+  // Open coin on Zora (Base) with referrer
   const openOnZora = () => {
-    window.open(`https://zora.co/coin/${contractAddress}`, '_blank');
+    const referrer = '0xbFA6A45Dd534d39dF47A3F3D2f2b6E88416f9831';
+    window.open(`https://zora.co/coin/base:${contractAddress}?referrer=${referrer}`, '_blank');
   };
 
   // Environment-aware sharing function
   const shareToken = async () => {
     try {
       const environment = detectEnvironment();
-      const shareText = `I just created ${tokenName} (${tokenSymbol}) on Base network using 8BitCoiner! 🚀\n\n${description}\n\nView on Zora: https://zora.co/coin/${contractAddress}\n\nCreate your own: https://farcaster.com/miniapps/VJFTWn45l8cA/8bitminter`;
+      const referrer = '0xbFA6A45Dd534d39dF47A3F3D2f2b6E88416f9831';
+      const zoraUrl = `https://zora.co/coin/base:${contractAddress}?referrer=${referrer}`;
+      const shareText = `I just created ${tokenName} (${tokenSymbol}) on Base network using 8BitCoiner! 🚀\n\n${description}\n\nView on Zora: ${zoraUrl}\n\nCreate your own: https://farcaster.com/miniapps/VJFTWn45l8cA/8bitminter`;
       
       console.log('Sharing in environment:', environment);
       
@@ -48,7 +51,7 @@ export function RetroSuccess({
             await (window as any).BaseApp.share({
               title: `${tokenName} Token Created!`,
               text: shareText,
-              url: `https://zora.co/coin/${contractAddress}`
+              url: zoraUrl
             });
             console.log("Shared using BaseApp");
             return;
@@ -59,7 +62,7 @@ export function RetroSuccess({
             await navigator.share({
               title: `${tokenName} Token Created!`,
               text: shareText,
-              url: `https://zora.co/coin/${contractAddress}`
+              url: zoraUrl
             });
             console.log("Shared using native Web Share API");
             return;
@@ -100,7 +103,9 @@ export function RetroSuccess({
     } catch (error) {
       console.error("Error sharing to Farcaster:", error);
       // Fallback to copy to clipboard - also updated with mini app link
-      navigator.clipboard.writeText(`I just created ${tokenName} (${tokenSymbol}) on Base network using 8BitCoiner! 🚀\n\n${description}\n\nView on Zora: https://zora.co/coin/${contractAddress}\n\nCreate your own: https://farcaster.com/miniapps/VJFTWn45l8cA/8bitminter`);
+      const referrer = '0xbFA6A45Dd534d39dF47A3F3D2f2b6E88416f9831';
+      const zoraUrl = `https://zora.co/coin/base:${contractAddress}?referrer=${referrer}`;
+      navigator.clipboard.writeText(`I just created ${tokenName} (${tokenSymbol}) on Base network using 8BitCoiner! 🚀\n\n${description}\n\nView on Zora: ${zoraUrl}\n\nCreate your own: https://farcaster.com/miniapps/VJFTWn45l8cA/8bitminter`);
       alert("Share text copied to clipboard. You can paste it in Farcaster.");
     }
   };
