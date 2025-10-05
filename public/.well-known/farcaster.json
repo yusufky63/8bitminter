@@ -4,11 +4,6 @@
     "payload": "eyJkb21haW4iOiI4Yml0bWludGVyLnZlcmNlbC5hcHAifQ",
     "signature": "MHhkMTIzZDUwNDZkZDE5MjlhMmNiMzMyM2FiM2M4Y2M5OTdiMWVjMjZjMjgxODM5Yzg3YmUxZTJlYzBhMDA0Mzg5NzE5NmYxMjlhMWI5OTA0NzA3MzU3MDlhMWUwMjk1YTIxMjU1OTNlYTE5MWFmYjhmMzI3MzAwZGY4NTg1YWY3MjFi"
   },
-  "baseBuilder": {
-    "allowedAddresses": [
-      "0xc0F52851fCAac0cac016432E5e11954632cd2fcB"
-    ]
-  },
   "miniapp": {
     "version": "1",
     "name": "8BitCoiner",
@@ -17,26 +12,22 @@
     "splashImageUrl": "https://8bitminter.vercel.app/logo.png",
     "splashBackgroundColor": "#181028",
     "webhookUrl": "https://8bitminter.vercel.app/api/webhook",
-    "subtitle": "Create retro-style tokens on Base",
+    "subtitle": "Retro tokens on Base",
     "description": "Create and mint 8-bit inspired tokens with AI-generated art on Base.",
-    "screenshotUrls": [
-      "https://8bitminter.vercel.app/images/screenshot1.png"
-    ],
+    "screenshotUrls": ["https://8bitminter.vercel.app/images/screenshot1.png"],
     "primaryCategory": "art-creativity",
-    "tags": [
-      "nft",
-      "tokens",
-      "blockchain",
-      "web3",
-      "8bit"
-    ],
+    "tags": ["nft", "tokens", "blockchain", "web3", "8bit"],
     "heroImageUrl": "https://8bitminter.vercel.app/opengraph-image.png",
-    "tagline": "Mint your retro token instantly",
+    "tagline": "Mint retro tokens instantly",
     "ogTitle": "8BitCoiner",
     "ogDescription": "Create retro-styled tokens on the blockchain with AI-generated art",
     "ogImageUrl": "https://8bitminter.vercel.app/opengraph-image.png",
     "noindex": false
   },
+  "baseBuilder": {
+    "allowedAddresses": ["0xc0F52851fCAac0cac016432E5e11954632cd2fcB"]
+  },
+
   "frame": {
     "version": "1",
     "name": "8BitCoiner",
@@ -46,16 +37,8 @@
     "splashBackgroundColor": "#181028",
     "primaryCategory": "art-creativity",
     "description": "Create and share your own 8-bit style tokens on the blockchain.",
-    "tags": [
-      "nft",
-      "tokens",
-      "blockchain",
-      "web3",
-      "8bit"
-    ],
-    "screenshotUrls": [
-      "https://8bitminter.vercel.app/images/screenshot1.png"
-    ],
+    "tags": ["nft", "tokens", "blockchain", "web3", "8bit"],
+    "screenshotUrls": ["https://8bitminter.vercel.app/images/screenshot1.png"],
     "webhookUrl": "https://8bitminter.vercel.app/api/webhook"
   }
 }
