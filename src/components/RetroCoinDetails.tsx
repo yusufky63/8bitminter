@@ -152,7 +152,7 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
 
   const [isLoading, setIsLoading] = useState(true);
   const [tokenDetails, setTokenDetails] = useState<TokenDetails | null>(null);
-  const [tradeAmount, setTradeAmount] = useState("0.01");
+  const [tradeAmount, setTradeAmount] = useState("0.001");
   const [tradeType, setTradeType] = useState<"buy" | "sell">("buy");
   const [isTrading, setIsTrading] = useState(false);
   const [ethToUsdRate, setEthToUsdRate] = useState<number>(3000); // Default ETH price
@@ -663,8 +663,9 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
 
   // Handle trade click with updated Zora SDK implementation
   const handleTradeClick = async () => {
-    if (!tokenDetails || !isWalletReady || !address) {
-      toast.error("Connect your wallet to trade");
+    // Ensure strong type narrowing for TS: publicClient and walletClient must be present
+    if (!tokenDetails || !address || !publicClient || !walletClient) {
+      toast.error("Connect your wallet on Base to trade");
       return;
     }
 
