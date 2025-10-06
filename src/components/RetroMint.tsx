@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
+import { SafeImage } from "./ui/SafeImage";
 import { RetroStepScreen } from "./RetroStepScreen";
 import { RetroDivider } from "./RetroDivider";
 import { RetroButton } from "./ui/RetroButton";
@@ -111,11 +112,12 @@ export function RetroMint({
             <div className="w-24 h-24 border-2 border-retro-primary mr-4">
             {displayImageUrl && resolveImageUrl(displayImageUrl) ? (
               <Image
-                src={resolveImageUrl(displayImageUrl)}
+                src={`/api/ipfs/proxy?u=${encodeURIComponent(resolveImageUrl(displayImageUrl))}`}
                 alt="Token"
                 width={96}
                 height={96}
                 className="w-full h-full object-cover pixelated"
+                unoptimized
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.style.display = 'none';

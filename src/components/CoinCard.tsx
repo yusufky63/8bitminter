@@ -122,7 +122,7 @@ export function CoinCard({ coin, onClick }: CoinCardProps) {
 
         {/* Stats */}
         <div className="text-xs text-center p-2 bg-retro-primary/10 border border-retro-primary">
-          {coin.holders !== undefined && (
+          {(coin.holders !== undefined && coin.holders !== null) && (
             <div className="text-retro-primary font-bold flex items-center justify-center gap-1 text-xs">
               <Users size={10} />
               {coin.holders} holders

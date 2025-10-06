@@ -74,7 +74,7 @@ export default function RetroHeader({
   };
 
   return (
-    <div className="w-full mb-1">
+    <div className="w-full mb-1 sticky top-0 z-50">
       <div className="crt-effect retro-container py-1 mb-0.5">
         <div className="retro-grid-background">
           <div className="flex items-center justify-between">
@@ -88,18 +88,24 @@ export default function RetroHeader({
                 8BitCoiner
               </h1>
             </div>
-            <div className="flex items-center gap-2">
-              {userInfo.name && (
-                <div className="text-xs text-retro-accent px-2 py-1 border border-retro-primary rounded">
-                  <span className="opacity-70">
-                    {userInfo.type === 'basename' ? 'BASE:' : 
-                     userInfo.type === 'farcaster' ? 'FC:' : ''}
-                  </span> {userInfo.name}
+            <div className="flex items-center">
+              <div className="text-[10px] leading-tight text-retro-accent px-2 py-1 border border-retro-primary rounded flex flex-col items-end">
+                {userInfo.name && (
+                  <div>
+                    <span className="opacity-70 mr-1">
+                      {userInfo.type === 'basename' ? 'BASE:' : userInfo.type === 'farcaster' ? 'FC:' : ''}
+                    </span>
+                    <span className="truncate max-w-[160px] inline-block align-top">{userInfo.name}</span>
+                  </div>
+                )}
+                <div className={userInfo.name ? 'mt-0.5' : ''}>
+                  <span className="opacity-70 mr-1">WALLET:</span>
+                  {isConnected && address ? (
+                    `${address.substring(0, 3)}...${address.substring(address.length - 2)}`
+                  ) : (
+                    <span className="opacity-80">NOT CONNECTED</span>
+                  )}
                 </div>
-              )}
-              <div className="text-xs text-retro-accent px-2 py-1 border border-retro-primary rounded">
-                <span className="opacity-70 mr-1">WALLET:</span>
-                {isConnected && address ? `${address.substring(0, 3)}...${address.substring(address.length - 2)}` : 'NOT CONNECTED'}
               </div>
             </div>
           </div>

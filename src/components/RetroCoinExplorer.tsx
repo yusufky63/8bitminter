@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
@@ -114,7 +114,7 @@ export default function RetroCoinExplorer({
   const [activeFilter, setActiveFilter] = useState<FilterType>(initialFilter);
   const [viewingDetails, setViewingDetails] = useState(false);
   const [selectedTokenAddress, setSelectedTokenAddress] = useState<string>("");
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
 
   // UI states - unified search
   const [searchTerm, setSearchTerm] = useState("");
@@ -173,7 +173,7 @@ export default function RetroCoinExplorer({
       }
 
       console.log(
-        `🔄 Fetching market data for ${coins.length} coins using batch request...`
+        `ğŸ”„ Fetching market data for ${coins.length} coins using batch request...`
       );
 
       // Prepare coins for batch request
@@ -182,17 +182,33 @@ export default function RetroCoinExplorer({
         chainId: coin.chain_id,
       }));
 
-      // Fetch all coins data in one request
-      const response = await getCoins({ coins: coinsForBatch });
+      // Zora API max batch size is 20: split and aggregate
+      const BATCH_SIZE = 20;
+      const batches: { collectionAddress: string; chainId: number }[][] = [];
+      for (let i = 0; i < coinsForBatch.length; i += BATCH_SIZE) {
+        batches.push(coinsForBatch.slice(i, i + BATCH_SIZE));
+      }
 
-      console.log("📊 Batch API response:", response);
+      const aggregated: any[] = [];
+      for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        try {
+          const resp = await getCoins({ coins: batch });
+          if (resp?.data?.zora20Tokens && Array.isArray(resp.data.zora20Tokens)) {
+            aggregated.push(...resp.data.zora20Tokens);
+          }
+        } catch (e) {
+          console.warn(`Batch ${i + 1}/${batches.length} failed`, e as any);
+        }
+      }
+
 
       const coinsWithMarketData: TokenDetails[] = [];
 
-      if (response?.data?.zora20Tokens) {
+      if (aggregated.length > 0) {
         // Create a map for quick lookup
         const marketDataMap = new Map();
-        response.data.zora20Tokens.forEach((token: any) => {
+        aggregated.forEach((token: any) => {
           marketDataMap.set(token.address.toLowerCase(), token);
         });
 
@@ -203,7 +219,7 @@ export default function RetroCoinExplorer({
           );
 
           if (marketData) {
-            console.log(`✅ Processing market data for ${coin.symbol}:`, {
+            console.log(`âœ… Processing market data for ${coin.symbol}:`, {
               totalSupply: marketData.totalSupply,
               uniqueHolders: marketData.uniqueHolders,
               volume24h: marketData.volume24h,
@@ -241,7 +257,7 @@ export default function RetroCoinExplorer({
             });
           } else {
             console.warn(
-              `⚠️ No market data found for ${coin.symbol} (${coin.contract_address})`
+              `âš ï¸ No market data found for ${coin.symbol} (${coin.contract_address})`
             );
             // Add basic data if no market data found
             coinsWithMarketData.push({
@@ -264,7 +280,7 @@ export default function RetroCoinExplorer({
           }
         });
       } else {
-        console.error("❌ Invalid response format from batch API");
+        console.error("âŒ Invalid response format from batch API");
         // Fallback: add basic data for all coins
         coins.forEach((coin) => {
           coinsWithMarketData.push({
@@ -288,11 +304,11 @@ export default function RetroCoinExplorer({
       }
 
       console.log(
-        `✅ Successfully processed ${coinsWithMarketData.length} coins with market data`
+        `âœ… Successfully processed ${coinsWithMarketData.length} coins with market data`
       );
       setLocalCoinsWithData(coinsWithMarketData);
     } catch (error) {
-      console.error("❌ Error loading local coins market data:", error);
+      console.error("âŒ Error loading local coins market data:", error);
 
       // Fallback: add basic data for all coins
       const fallbackData: TokenDetails[] = coins.map((coin) => ({
@@ -386,8 +402,8 @@ export default function RetroCoinExplorer({
           fetchFunction = fetchTopVolume;
       }
 
-      console.log("🔄 Fetching market data with filter:", activeFilter);
-      console.log("🔄 Using function:", fetchFunction.name);
+      console.log("ğŸ”„ Fetching market data with filter:", activeFilter);
+      console.log("ğŸ”„ Using function:", fetchFunction.name);
 
       const data = (await fetchFunction({
         count: 100, // Increased from 50 to get more data
@@ -399,14 +415,14 @@ export default function RetroCoinExplorer({
       let processedTokens: TokenDetails[] = [];
 
       if (data && data.exploreList && data.exploreList.edges) {
-        console.log("✅ Found exploreList.edges, processing...");
-        console.log("📊 Edges length:", data.exploreList.edges.length);
-        console.log("📊 First edge sample:", data.exploreList.edges[0]);
+        console.log("âœ… Found exploreList.edges, processing...");
+        console.log("ğŸ“Š Edges length:", data.exploreList.edges.length);
+        console.log("ğŸ“Š First edge sample:", data.exploreList.edges[0]);
 
         processedTokens = data.exploreList.edges.map(
           (edge: any, index: number) => {
             const node = edge.node;
-            console.log(`📊 Processing token ${index + 1}:`, {
+            console.log(`ğŸ“Š Processing token ${index + 1}:`, {
               address: node.address,
               symbol: node.symbol,
               description: node.description,
@@ -439,14 +455,14 @@ export default function RetroCoinExplorer({
           }
         );
 
-        console.log("✅ Processed tokens array:", processedTokens);
+        console.log("âœ… Processed tokens array:", processedTokens);
 
         // Update pagination cursor
         const pageInfo = data.exploreList.pageInfo;
         if (pageInfo) {
           setHasMore(pageInfo.hasNextPage || false);
           setPaginationCursor(pageInfo.endCursor || null);
-          console.log("📊 Pagination info:", pageInfo);
+          console.log("ğŸ“Š Pagination info:", pageInfo);
         }
       } else if (
         data &&
@@ -454,13 +470,13 @@ export default function RetroCoinExplorer({
         data.data.exploreList &&
         data.data.exploreList.edges
       ) {
-        console.log("✅ Found data.exploreList.edges format, processing...");
+        console.log("âœ… Found data.exploreList.edges format, processing...");
         const edges = data.data.exploreList.edges;
-        console.log("📊 Edges length:", edges.length);
+        console.log("ğŸ“Š Edges length:", edges.length);
 
         processedTokens = edges.map((edge: any, index: number) => {
           const node = edge.node;
-          console.log(`📊 Processing token ${index + 1}:`, {
+          console.log(`ğŸ“Š Processing token ${index + 1}:`, {
             address: node.address,
             symbol: node.symbol,
             description: node.description,
@@ -503,8 +519,8 @@ export default function RetroCoinExplorer({
       setTokensData(processedTokens);
       setTokenDetails(null);
     } catch (error) {
-      console.error("❌ Error fetching market data:", error);
-      console.error("❌ Error details:", error);
+      console.error("âŒ Error fetching market data:", error);
+      console.error("âŒ Error details:", error);
       setIsError(true);
       toast.error("Failed to load market data");
     } finally {
@@ -687,7 +703,6 @@ export default function RetroCoinExplorer({
                   : "bg-transparent text-retro-accent border-retro-primary hover:bg-retro-primary/20"
               }`}
             >
-              <Home size={18} />
               <span>Platform Coins</span>
               <span className="text-xs bg-retro-darker/30 px-2 py-1 rounded">
                 {localCoins.length}
@@ -702,7 +717,6 @@ export default function RetroCoinExplorer({
                   : "bg-transparent text-retro-accent border-retro-primary hover:bg-retro-primary/20"
               }`}
             >
-              <BarChart3 size={18} />
               <span> All Coins</span>
             </button>
           </div>
@@ -730,18 +744,7 @@ export default function RetroCoinExplorer({
           </div>
 
           {/* Stats for local platform */}
-          {activePlatform === "local" && (
-            <div className="flex justify-center gap-6 mt-4 text-sm text-retro-secondary">
-              <span className="flex items-center gap-2">
-                <BarChart3 size={14} />
-                {stats.totalCoins} Total Coins
-              </span>
-              <span className="flex items-center gap-2">
-                <Users size={14} />
-                {stats.totalCreators} Creators
-              </span>
-            </div>
-          )}
+          {/* stats hidden */}
         </div>
       </div>
 
@@ -846,7 +849,7 @@ export default function RetroCoinExplorer({
                       </span>
                     </div>
                   )}
-                  {tokenDetails.holders && (
+                  {(tokenDetails.holders !== undefined && tokenDetails.holders !== null) && (
                     <div>
                       <span className="text-retro-secondary">Holders:</span>{" "}
                       <span className="text-retro-accent">
@@ -997,7 +1000,7 @@ export default function RetroCoinExplorer({
     if (filteredLocalCoins.length === 0) {
       return (
         <div className="text-center py-16">
-          <div className="text-8xl mb-6">🪙</div>
+          <div className="text-8xl mb-6">ğŸª™</div>
           <div className="text-retro-primary text-xl font-bold mb-4">
             {searchTerm ? "No coins found" : "No coins created yet"}
           </div>
@@ -1145,7 +1148,7 @@ function TokenImage({
         className={`${dimensions.className} bg-retro-primary/5 flex items-center justify-center rounded-md`}
       >
         <span className="text-retro-primary text-lg font-bold">
-          {name ? name.charAt(0).toUpperCase() : "📷"}
+          {name ? name.charAt(0).toUpperCase() : "ğŸ“·"}
         </span>
       </div>
     );
@@ -1165,7 +1168,7 @@ function TokenImage({
         alt={name}
         width={dimensions.width}
         height={dimensions.height}
-        className={`${dimensions.className} rounded-md pixelated object-cover`}
+        className={`${dimensions.className} rounded-md pixelated object-contain bg-black/30`}
         unoptimized
         onLoad={handleImageLoad}
         onError={handleImageError}
@@ -1173,3 +1176,5 @@ function TokenImage({
     </div>
   );
 }
+
+

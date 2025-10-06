@@ -1369,9 +1369,7 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
                     @{tokenDetails.creator.profileName}
                   </span>
                 </div>
-                <RetroButton onClick={openOnZora} className="text-[10px] py-1 px-2 whitespace-nowrap">
-                  VIEW ON ZORA
-                </RetroButton>
+                {/* Zora button removed per request */}
               </div>
             )}
           </div>
@@ -1617,7 +1615,7 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
 
               {/* Token stats in grid layout */}
               <div className="grid grid-cols-2 gap-2 mb-4">
-                {tokenDetails.uniqueHolders && (
+                {(tokenDetails.uniqueHolders !== undefined && tokenDetails.uniqueHolders !== null) && (
                   <div className=" p-3  border-2 border-retro-primary  transition-all hover:border-retro-accent">
                     <span className="text-retro-secondary text-xs font-bold block mb-1">
                       HOLDERS
@@ -2067,7 +2065,7 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
             <div>
               {/* Analysis Question Input */}
               <div className="mb-4">
-                <label className="text-retro-primary text-xs font-bold mb-3 pixelated flex items-center">
+                <label className="text-retro-primary text-[11px] font-semibold mb-2 pixelated flex items-center">
                   <svg
                     width="14"
                     height="14"
@@ -2086,20 +2084,20 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
                 </label>
                 <input
                   type="text"
-                  className="retro-input w-full text-xs py-3 border-2 border-retro-primary text-retro-accent bg-black/60 mb-4"
+                  className="retro-input w-full text-[11px] py-2 border border-retro-primary text-retro-accent bg-black/60 mb-3"
                   value={analysisQuestion}
                   onChange={(e) => setAnalysisQuestion(e.target.value)}
                   placeholder="What would you like to know about this token?"
                 />
 
                 {/* Quick Question Buttons */}
-                <div className="grid grid-cols-1 gap-2 mb-4 text-xs">
+                <div className="grid grid-cols-1 gap-2 mb-3 text-[11px]">
                   <RetroButton
                     onClick={() =>
                       setAnalysisQuestion("Is this token a good investment?")
                     }
                     variant="outline"
-                    className="text-xs py-2 bg-transparent border-retro-primary hover:bg-retro-primary/20 text-left flex items-center"
+                    className="text-[11px] py-1.5 bg-transparent border-retro-primary hover:bg-retro-primary/20 text-left flex items-center"
                   >
                     Is this token a good investment?
                   </RetroButton>
@@ -2110,7 +2108,7 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
                       )
                     }
                     variant="outline"
-                    className="text-xs py-2 bg-transparent border-retro-primary hover:bg-retro-primary/20 text-left flex items-center"
+                    className="text-[11px] py-1.5 bg-transparent border-retro-primary hover:bg-retro-primary/20 text-left flex items-center"
                   >
                     What are the risks of this token?
                   </RetroButton>
@@ -2121,7 +2119,7 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
                       )
                     }
                     variant="outline"
-                    className="text-[10px] py-2 bg-transparent border-retro-primary hover:bg-retro-primary/20 text-left flex items-center"
+                    className="text-[10px] py-1.5 bg-transparent border-retro-primary hover:bg-retro-primary/20 text-left flex items-center"
                   >
                     How does it compare to others?
                   </RetroButton>

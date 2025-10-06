@@ -5,6 +5,7 @@ const PINATA_JWT = process.env.NEXT_PUBLIC_PINATA_JWT;
 
 // Güvenilir IPFS Gateway'leri - ipfs.io'yu öncelikten düşürdük çünkü zaman aşımı yaşanıyor
 const IPFS_GATEWAYS = [
+  'https://brown-naked-reindeer-865.mypinata.cloud/ipfs/', // Custom Pinata gateway (preferred)
   'https://ipfs.io/ipfs/',
   'https://gateway.pinata.cloud/ipfs/',
   'https://cloudflare-ipfs.com/ipfs/',

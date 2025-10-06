@@ -1,4 +1,5 @@
 import { processTtlgenHerImage } from "./imageUtils";
+import { generateGeminiImageStream } from "./geminiImage";
 
 // =============================================================================
 // CONSTANTS & CONFIGURATION
@@ -11,6 +12,7 @@ const API_ENDPOINTS = {
   TOGETHER_IMAGE: "https://api.together.xyz/v1/images/generations",
   STABILITY_AI: "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image",
   REPLICATE: "https://api.replicate.com/v1/predictions",
+  GEMINI_IMAGEN3_FAST: "https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-fast:generateImages",
 };
 
 const MODELS = {
@@ -25,6 +27,7 @@ const MODELS = {
   IMAGE: {
     TOGETHER: "black-forest-labs/FLUX.1-schnell-Free",
     REPLICATE: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
+    GEMINI: "imagen-3.0-fast",
   },
 };
 
@@ -167,8 +170,8 @@ const generateImageWithStabilityAI = async (name, symbol, description) => {
       },
     ],
     cfg_scale: 15,
-    height: 512,
-    width: 512,
+    height: 1024,
+    width: 1024,
     samples: 1,
     steps: 40,
     style_preset: "pixel-art",
@@ -490,19 +493,16 @@ export const generateImageWithAI = async (name, symbol, description, categoryCon
   console.log("Inputs:", { name, symbol, description });
   
   const apiProviders = [
-    {
-      name: "Stability AI",
-      generator: () => generateImageWithStabilityAI(name, symbol, description),
-    },
-    {
-      name: "Together.ai",
-      generator: () => generateImageWithTogetherAI(name, symbol, description, categoryContext),
-    },
-    
-    {
-      name: "Replicate",
-      generator: () => generateImageWithReplicate(name, symbol, description),
-    },
+    // Prefer Gemini via SDK streaming (fast + high quality)
+    { name: "GeminiSDK", generator: () => generateGeminiImageStream(name, symbol, description, categoryContext?.name) },
+    // Fallback to REST endpoint in case SDK fails / model not enabled
+    { name: "Gemini", generator: () => generateImageWithGemini(name, symbol, description, categoryContext) },
+    // Then Together.ai as a strong fallback
+    { name: "Together.ai", generator: () => generateImageWithTogetherAI(name, symbol, description, categoryContext) },
+    // Then Stability AI (1024x1024 config)
+    { name: "Stability AI", generator: () => generateImageWithStabilityAI(name, symbol, description) },
+    // Final fallback
+    { name: "Replicate", generator: () => generateImageWithReplicate(name, symbol, description) },
   ];
 
   let lastError = null;
@@ -512,7 +512,7 @@ export const generateImageWithAI = async (name, symbol, description, categoryCon
       console.log(`Attempting image generation with ${provider.name}...`);
       const imageUrl = await provider.generator();
       
-      if (imageUrl && (imageUrl.startsWith("http://") || imageUrl.startsWith("https://") || imageUrl.startsWith("blob:"))) {
+      if (imageUrl && (imageUrl.startsWith("http://") || imageUrl.startsWith("https://") || imageUrl.startsWith("blob:") || imageUrl.startsWith("data:"))) {
         console.log(`✅ Image generated successfully with ${provider.name}`);
         return imageUrl;
       } else {
@@ -771,3 +771,60 @@ IMPORTANT: Your entire response must be under 250 words. Focus on the data while
 export const getCoinCategories = () => COIN_CATEGORIES;
 
 export { retryOperation };
+/**
+ * Gemini Imagen 3 (Fast) Image Generation
+ */
+const generateImageWithGemini = async (name, symbol, description, categoryContext) => {
+  const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_GEMINI_API_KEY;
+  if (!GEMINI_API_KEY) {
+    throw new Error("Gemini API key not configured");
+  }
+
+  const category = categoryContext ? categoryContext.name : "token";
+  const safeName = sanitizeText(name);
+  const safeDescription = sanitizeText(description);
+
+  const prompt = `Pixel art style cryptocurrency token logo for "${safeName}" (${symbol}). Category: ${category}. ${
+    safeDescription ? `Theme: ${safeDescription}` : ""
+  }. 8-bit retro style, arcade-inspired, pixelated, nostalgic game art, circular coin emblem, limited 4-8 color palette, chunky pixels, crisp edges, nearest-neighbor, no gradients.`;
+
+  const body = {
+    prompt: { text: prompt },
+    // Hints used by Imagen 3 API; fields may vary by version
+    negativePrompt: "text, words, letters, numbers, watermark, realistic, photorealistic, 3D, gradients, blur, anti-aliasing, detailed shading",
+    imageFormat: "png",
+    width: 1024,
+    height: 1024,
+    // Safety & style controls can be added here when needed
+  };
+
+  const resp = await fetch(`${API_ENDPOINTS.GEMINI_IMAGEN3_FAST}?key=${GEMINI_API_KEY}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!resp.ok) {
+    let errText = "";
+    try { errText = await resp.text(); } catch {}
+    throw new Error(`Gemini API error: ${resp.status} ${errText || ""}`);
+  }
+
+  const data = await resp.json();
+  // Try common shapes for Imagen 3 responses
+  let base64 = null;
+  try {
+    base64 = data?.images?.[0]?.image?.bytesBase64Encoded
+      || data?.images?.[0]?.image?.base64
+      || data?.images?.[0]?.base64
+      || data?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data
+      || null;
+  } catch {}
+
+  if (!base64) {
+    throw new Error("Gemini returned no image data");
+  }
+
+  // Return a data URL to be pinned by our IPFS route
+  return `data:image/png;base64,${base64}`;
+};

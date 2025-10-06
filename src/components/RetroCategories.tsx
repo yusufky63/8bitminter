@@ -23,23 +23,23 @@ export function RetroCategories({
   onCategoryChange,
   onDescriptionChange,
   onNext,
-  isLoading
+  isLoading,
 }: RetroCategoriesProps) {
   const [showCategoryInfo, setShowCategoryInfo] = useState(false);
-  
-  const categoryOptions = categories.map(cat => ({
+
+  const categoryOptions = categories.map((cat) => ({
     value: cat.name,
-    label: cat.name
+    label: cat.name,
   }));
-  
+
   // Add empty option
   categoryOptions.unshift({ value: "", label: "Choose a category" });
 
   const isNextDisabled = !category || !description || description.length < 3;
-  
+
   // Find the selected category object
-  const selectedCategory = categories.find(cat => cat.name === category);
-  
+  const selectedCategory = categories.find((cat) => cat.name === category);
+
   // Examples for each category to inspire the user
   const getCategoryExample = (categoryName: string) => {
     switch (categoryName) {
@@ -67,39 +67,43 @@ export function RetroCategories({
         return "";
     }
   };
-  
+
   // Direct API call for token generation
   const handleAnalyzeClick = async () => {
     console.log("ANALYZE button clicked!");
     console.log("Category:", category);
     console.log("Description:", description);
-    
+
     // More specific error checks
     if (!category) {
       console.log("Button is disabled - category missing");
-      toast.error("Please select a category", { id: 'status-toast' });
+      toast.error("Please select a category", { id: "status-toast" });
       return;
     }
-    
+
     if (!description || description.length < 3) {
       console.log("Button is disabled - description too short");
-      toast.error("Please provide a description (minimum 3 characters)", { id: 'status-toast' });
+      toast.error("Please provide a description (minimum 3 characters)", {
+        id: "status-toast",
+      });
       return;
     }
-    
+
     // Show loading state for analysis
-    toast.loading("Analyzing your description...", { id: 'status-toast' });
-    
+    toast.loading("Analyzing your description...", { id: "status-toast" });
+
     // Forward to onNext handler if provided
     try {
-      if (typeof onNext === 'function') {
+      if (typeof onNext === "function") {
         console.log("Calling onNext function to generate token details...");
         onNext();
         return;
       }
     } catch (error) {
       console.error("Error processing category selection:", error);
-      toast.error("An error occurred. Please try again.", { id: 'status-toast' });
+      toast.error("An error occurred. Please try again.", {
+        id: "status-toast",
+      });
     }
   };
 
@@ -115,8 +119,6 @@ export function RetroCategories({
         hideButtons={true} // Hide default buttons, we'll use our own
         className="mb-2"
       >
-        
-        
         <RetroSelect
           label="TOKEN CATEGORY"
           options={categoryOptions}
@@ -126,48 +128,62 @@ export function RetroCategories({
             setShowCategoryInfo(true);
           }}
         />
-        
+
         {/* Show category details when a category is selected */}
         {category && selectedCategory && (
           <div className="mt-3 mb-1 border-2 border-retro-primary p-2 font-mono">
             <div className="flex justify-between items-center mb-2">
-              <h3 className="text-retro-accent font-bold pixelated text-sm">{selectedCategory.name}</h3>
-              <button 
+              <h3 className="text-retro-accent font-bold pixelated text-sm">
+                {selectedCategory.name}
+              </h3>
+              <button
                 onClick={toggleCategoryInfo}
                 className="text-xs bg-retro-primary text-white px-2 py-0.5 hover:bg-retro-primary/80"
               >
                 {showCategoryInfo ? "HIDE INFO" : "SHOW INFO"}
               </button>
             </div>
-            
+
             {showCategoryInfo && (
               <div className="text-xs text-retro-light">
                 <div className="mb-2">
-                  <span className="text-retro-secondary">FEATURES:</span> {selectedCategory.features}
+                  <span className="text-retro-secondary">FEATURES:</span>{" "}
+                  {selectedCategory.features}
                 </div>
                 <div className="mb-2">
-                  <span className="text-retro-secondary">THEMES:</span> {selectedCategory.themes}
+                  <span className="text-retro-secondary">THEMES:</span>{" "}
+                  {selectedCategory.themes}
                 </div>
                 {/* EXAMPLE section removed per request */}
               </div>
             )}
           </div>
         )}
-        
+
         <RetroTextarea
           label="DESCRIBE YOUR RETRO TOKEN"
           value={description}
-          onChange={e => onDescriptionChange(e.target.value)}
+          onChange={(e) => onDescriptionChange(e.target.value)}
           placeholder="Enter details about your retro token's purpose, pixel aesthetics, and special 8-bit features..."
         />
-        
+
         <div className="text-xs text-retro-accent mt-2 font-mono">
-          <p className="mb-1">* SELECT A CATEGORY AND PROVIDE A DETAILED DESCRIPTION</p>
+          <p className="mb-1">
+            * SELECT A CATEGORY AND PROVIDE A DETAILED DESCRIPTION
+          </p>
           <p>* THE AI WILL GENERATE YOUR PIXEL-PERFECT TOKEN</p>
           {category === "" && (
-            <p className="text-retro-error mt-1 bg-retro-dark/50 p-1">* CATEGORY NOT SELECTED</p>
+            <p className="text-retro-error mt-1 bg-retro-dark/50 p-1">
+              * CATEGORY NOT SELECTED
+            </p>
           )}
-          <div className={`text-xl text-center mb-1 transition-colors duration-300 ${description && description.length < 3 ? 'text-retro-error' : 'text-retro-accent'}`}>
+          <div
+            className={`text-xl text-center mb-1 transition-colors duration-300 ${
+              description && description.length < 3
+                ? "text-retro-error"
+                : "text-retro-accent"
+            }`}
+          >
             {description && description.length < 3 && description.length > 0 ? (
               <span className="animate-pulse">MIN 3 CHARACTERS</span>
             ) : (
@@ -176,7 +192,7 @@ export function RetroCategories({
           </div>
         </div>
       </RetroStepScreen>
-      
+
       {/* Large, prominent action button with pixelated design */}
       <div className="mt-4 text-center">
         <RetroButton
@@ -186,7 +202,18 @@ export function RetroCategories({
           className="py-4 w-full text-lg pixelated border-2 border-retro-primary"
         >
           <span className="flex items-center justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter" className="mr-2">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="square"
+              strokeLinejoin="miter"
+              className="mr-2"
+            >
               <circle cx="12" cy="12" r="10"></circle>
               <line x1="12" y1="8" x2="12" y2="16"></line>
               <line x1="8" y1="12" x2="16" y2="12"></line>
@@ -197,4 +224,4 @@ export function RetroCategories({
       </div>
     </div>
   );
-} 
+}

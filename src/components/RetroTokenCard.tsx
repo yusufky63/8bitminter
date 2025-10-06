@@ -1,4 +1,5 @@
 import React from 'react';
+import { SafeImage } from './ui/SafeImage';
 
 export interface RetroToken {
   address: string;
@@ -17,24 +18,27 @@ export interface RetroToken {
 }
 
 function formatNumber(value?: number): string {
-  if (value === undefined || value === null || isNaN(value)) return 'N/A';
-  if (value >= 1_000_000_000) return (value / 1_000_000_000).toFixed(2) + 'B';
-  if (value >= 1_000_000) return (value / 1_000_000).toFixed(2) + 'M';
-  if (value >= 1_000) return (value / 1_000).toFixed(2) + 'K';
-  if (value < 0.001 && value > 0) return '<0.001';
-  return value.toFixed(value < 1 ? 4 : 2);
+  if (value === undefined || value === null || isNaN(value as any)) return 'N/A';
+  const num = Number(value);
+  if (num >= 1_000_000_000) return (num / 1_000_000_000).toFixed(2) + 'B';
+  if (num >= 1_000_000) return (num / 1_000_000).toFixed(2) + 'M';
+  if (num >= 1_000) return (num / 1_000).toFixed(2) + 'K';
+  if (num < 0.001 && num > 0) return '<0.001';
+  return num.toFixed(num < 1 ? 4 : 2);
 }
 
 function formatChange(value?: number): { text: string; color: string } {
-  if (value === undefined || value === null || isNaN(value)) return { text: '—', color: 'text-retro-secondary' };
-  const sign = value >= 0 ? '+' : '';
-  const color = value >= 0 ? 'text-green-400' : 'text-red-400';
-  return { text: `${sign}${value.toFixed(2)}%`, color };
+  if (value === undefined || value === null || isNaN(value as any)) return { text: 'N/A', color: 'text-retro-secondary' };
+  const num = Number(value);
+  const sign = num >= 0 ? '+' : '';
+  const color = num >= 0 ? 'text-green-400' : 'text-red-400';
+  return { text: `${sign}${num.toFixed(2)}%`, color };
 }
 
-export function RetroTokenCard({ token, onClick, variant = 'card' }: { token: RetroToken; onClick?: (address: string) => void; variant?: 'card' | 'list' }) {
-  const change = formatChange(token.change24hPct);
-  
+export function RetroTokenCard({ token, onClick, variant = 'list' }: { token: RetroToken; onClick?: (address: string) => void; variant?: 'card' | 'list' }) {
+  const hasChange = token.change24hPct !== undefined && token.change24hPct !== null && !isNaN(Number(token.change24hPct));
+  const change = hasChange ? formatChange(Number(token.change24hPct)) : null;
+
   // Compact row variant (no big image)
   if (variant === 'list') {
     return (
@@ -45,11 +49,10 @@ export function RetroTokenCard({ token, onClick, variant = 'card' }: { token: Re
         {/* Small thumbnail */}
         <div className="w-12 h-12 border border-retro-primary overflow-hidden flex items-center justify-center bg-retro-primary/10">
           {token.image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={token.image} alt={token.name} className="w-full h-full object-cover" />
+            <SafeImage src={token.image} alt={token.name} width={48} height={48} className="w-full h-full object-cover bg-black/30" />
           ) : (
             <span className="text-retro-primary text-sm font-bold">
-              {token.symbol?.[0]?.toUpperCase() || token.name?.[0]?.toUpperCase() || '🪙'}
+              {token.symbol?.[0]?.toUpperCase() || token.name?.[0]?.toUpperCase() || '?'}
             </span>
           )}
         </div>
@@ -65,7 +68,9 @@ export function RetroTokenCard({ token, onClick, variant = 'card' }: { token: Re
                 <span className="ml-1 text-xs text-retro-secondary truncate">({token.symbol})</span>
               )}
             </div>
-            <div className={`text-xs font-mono whitespace-nowrap ${change.color}`}>{change.text}</div>
+            {hasChange && (
+              <div className={`text-xs font-mono whitespace-nowrap ${change!.color}`}>{change!.text}</div>
+            )}
           </div>
 
           {/* Compact stats (no inner borders) */}
@@ -80,7 +85,7 @@ export function RetroTokenCard({ token, onClick, variant = 'card' }: { token: Re
             </div>
             <div className="px-1 py-1">
               <div className="text-retro-secondary text-[10px]">HOLD</div>
-              <div className="text-retro-primary font-mono text-sm">{token.holders ?? '—'}</div>
+              <div className="text-retro-primary font-mono text-sm">{token.holders ?? 'N/A'}</div>
             </div>
           </div>
         </div>
@@ -96,12 +101,11 @@ export function RetroTokenCard({ token, onClick, variant = 'card' }: { token: Re
       {/* Image */}
       <div className="relative aspect-square overflow-hidden border-b-2 border-retro-primary">
         {token.image ? (
-          // Next/Image optional; use plain img to avoid config issues
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <SafeImage
             src={token.image}
             alt={token.name}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            fluid
+            className="w-full h-full object-contain bg-black/30 transition-transform duration-300 group-hover:scale-105"
           />
         ) : (
           <div className="w-full h-full bg-retro-primary/10 flex items-center justify-center text-retro-primary text-xs">
@@ -111,7 +115,7 @@ export function RetroTokenCard({ token, onClick, variant = 'card' }: { token: Re
 
         {/* Symbol badge */}
         <div className="absolute top-2 left-2 bg-retro-darker/80 border border-retro-primary text-retro-primary text-xs font-bold px-2 py-0.5">
-          {token.symbol || '—'}
+          {token.symbol || 'N/A'}
         </div>
         {/* Currency badge */}
         {token.currency && (
@@ -132,7 +136,9 @@ export function RetroTokenCard({ token, onClick, variant = 'card' }: { token: Re
               <span className="text-xs text-retro-secondary truncate">({token.symbol})</span>
             )}
           </div>
-          <div className={`text-xs font-mono ${change.color}`}>{change.text}</div>
+          {hasChange && (
+            <div className={`text-xs font-mono ${change!.color}`}>{change!.text}</div>
+          )}
         </div>
 
         {token.description && (
@@ -153,7 +159,7 @@ export function RetroTokenCard({ token, onClick, variant = 'card' }: { token: Re
 
         <div className="flex items-center justify-between mt-2 text-sm">
           <div className="text-retro-secondary text-xs">HOLDERS</div>
-          <div className="text-retro-primary font-mono text-sm">{token.holders ?? '—'}</div>
+          <div className="text-retro-primary font-mono text-sm">{token.holders ?? 'N/A'}</div>
         </div>
       </div>
     </div>

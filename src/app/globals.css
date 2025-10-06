@@ -192,7 +192,7 @@ body {
   background-color: var(--retro-primary);
   color: var(--retro-darker);
   border: none;
-  padding: 0.5rem 1rem;
+  padding: 0.3rem 1rem;
   font-weight: bold;
   text-transform: uppercase;
   cursor: pointer;
@@ -359,26 +359,14 @@ body {
 
 .retro-step-indicator {
   display: flex;
-  justify-content: space-between;
-  margin-bottom: 1.5rem;
-  position: relative;
-}
-
-.retro-step-indicator::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background-color: var(--retro-darker);
-  transform: translateY(-50%);
-  z-index: 0;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .retro-step {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   border: 2px solid var(--retro-primary);
   background-color: var(--retro-darker);
   border-radius: 2px;
@@ -389,7 +377,7 @@ body {
   color: var(--retro-primary);
   position: relative;
   z-index: 1;
-  font-size: 0.75rem;
+  font-size: 0.625rem; /* smaller numbers */
 }
 
 .retro-step.active {
@@ -401,6 +389,21 @@ body {
   background-color: var(--retro-success);
   border-color: var(--retro-success);
   color: var(--retro-darker);
+}
+
+/* Connector between steps */
+.retro-step-connector {
+  flex: 1 1 auto;
+  height: 2px;
+  background-color: rgba(255,255,255,0.1);
+  border: 1px solid var(--retro-border);
+  border-left: 0;
+  border-right: 0;
+}
+
+.retro-step-connector.completed {
+  background-color: var(--retro-success);
+  border-color: var(--retro-success);
 }
 
 .retro-badge {

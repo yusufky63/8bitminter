@@ -4,9 +4,10 @@
 
 // List of fast and reliable IPFS gateways (in order of preference)
 const IPFS_GATEWAYS = [
-  'https://ipfs.io/ipfs/', // Official gateway - most reliable
-  'https://gateway.pinata.cloud/ipfs/', // Pinata is very reliable
-  'https://cloudflare-ipfs.com/ipfs/', // Cloudflare 
+  'https://brown-naked-reindeer-865.mypinata.cloud/ipfs/', // Custom Pinata gateway (preferred)
+  'https://ipfs.io/ipfs/', // Official gateway
+  'https://gateway.pinata.cloud/ipfs/', // Pinata
+  'https://cloudflare-ipfs.com/ipfs/', // Cloudflare
   'https://dweb.link/ipfs/', // Protocol Labs
 ];
 

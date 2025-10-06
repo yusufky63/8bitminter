@@ -30,6 +30,11 @@ const nextConfig = {
       },
       {
         protocol: "https",
+        hostname: "brown-naked-reindeer-865.mypinata.cloud",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
         hostname: "api.stability.ai",
         pathname: "/**",
       },
@@ -46,6 +51,11 @@ const nextConfig = {
       {
         protocol: "https",
         hostname: "tjzk.replicate.delivery",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "gemini.googleapis.com",
         pathname: "/**",
       },
     ],

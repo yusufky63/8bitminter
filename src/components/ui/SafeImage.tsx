@@ -11,6 +11,7 @@ interface SafeImageProps {
   className?: string;
   fallbackText?: string;
   fallbackIcon?: React.ReactNode;
+  fluid?: boolean;
 }
 
 export function SafeImage({ 
@@ -20,7 +21,8 @@ export function SafeImage({
   height = 100, 
   className = '', 
   fallbackText = 'NO IMAGE',
-  fallbackIcon = <Camera size={20} />
+  fallbackIcon = <Camera size={20} />,
+  fluid = false
 }: SafeImageProps) {
   const [imageError, setImageError] = useState(false);
   const [imageSrc, setImageSrc] = useState('');
@@ -75,8 +77,8 @@ export function SafeImage({
   if (imageError || !imageSrc) {
     return (
       <div 
-        className={`flex items-center justify-center bg-retro-darker/30 border border-retro-primary/30 ${className}`}
-        style={{ width, height }}
+        className={`flex items-center justify-center bg-retro-darker/30 border border-retro-primary/30 ${className} ${fluid ? 'w-full h-full' : ''}`}
+        style={fluid ? undefined : { width, height }}
       >
         <div className="text-center">
           <div className="text-retro-primary mb-1">{fallbackIcon}</div>
@@ -87,27 +89,37 @@ export function SafeImage({
   }
 
   return (
-    <div className={`relative ${className}`} style={{ width, height }}>
+    <div className={`relative ${className} ${fluid ? 'w-full h-full' : ''}`} style={fluid ? undefined : { width, height }}>
       {isLoading && (
         <div 
           className="absolute inset-0 flex items-center justify-center bg-retro-darker/50"
-          style={{ width, height }}
+          style={fluid ? undefined : { width, height }}
         >
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-retro-primary"></div>
         </div>
       )}
-      <Image
-        src={imageSrc}
-        alt={alt}
-        width={width}
-        height={height}
-        className={`object-contain transition-opacity duration-300 ${
-          isLoading ? 'opacity-0' : 'opacity-100'
-        }`}
-        onLoad={handleImageLoad}
-        onError={handleImageError}
-        unoptimized
-      />
+      {fluid ? (
+        <Image
+          src={imageSrc}
+          alt={alt}
+          fill
+          className={`object-contain transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+          onLoad={handleImageLoad}
+          onError={handleImageError}
+          unoptimized
+        />
+      ) : (
+        <Image
+          src={imageSrc}
+          alt={alt}
+          width={width}
+          height={height}
+          className={`object-contain transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+          onLoad={handleImageLoad}
+          onError={handleImageError}
+          unoptimized
+        />
+      )}
     </div>
   );
 } 
