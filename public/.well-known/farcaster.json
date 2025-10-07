@@ -25,28 +25,5 @@
     "ogDescription": "Create retro-styled tokens on the blockchain with AI-generated art",
     "ogImageUrl": "https://8bitminter.vercel.app/opengraph-image.png",
     "noindex": false
-  },
-  "frame": {
-    "version": "1",
-    "name": "8BitCoiner",
-    "subtitle": "Retro tokens on Base",
-    "description": "Create and mint 8-bit inspired tokens with AI-generated art on Base.",
-    "iconUrl": "https://8bitminter.vercel.app/logo.png",
-    "splashImageUrl": "https://8bitminter.vercel.app/logo.png",
-    "splashBackgroundColor": "#181028",
-    "homeUrl": "https://8bitminter.vercel.app",
-    "primaryCategory": "art-creativity",
-    "heroImageUrl": "https://8bitminter.vercel.app/opengraph-image.png",
-    "tagline": "Mint retro tokens instantly",
-    "ogTitle": "8BitCoiner",
-    "ogImageUrl": "https://8bitminter.vercel.app/opengraph-image.png",
-    "canonicalDomain": "8bitminter.vercel.app",
-    "requiredChains": ["eip155:8453"],
-    "tags": ["nft", "tokens", "blockchain", "web3", "8bit"],
-    "requiredCapabilities": [
-      "actions.ready",
-      "actions.signIn",
-      "actions.openUrl"
-    ]
   }
 }
