@@ -1,0 +1,18 @@
+{
+  "name": "8BitCoiner",
+  "short_name": "8BitCoiner",
+  "description": "Create retro-styled tokens on the blockchain with AI-generated art",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#181028",
+  "theme_color": "#181028",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

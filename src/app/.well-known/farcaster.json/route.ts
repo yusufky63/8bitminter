@@ -1,0 +1,43 @@
+function withValidProperties(properties: Record<string, undefined | string | string[]>) {
+  return Object.fromEntries(
+    Object.entries(properties).filter(([_, value]) => (Array.isArray(value) ? value.length > 0 : !!value))
+  );
+}
+
+export async function GET() {
+  const URL = process.env.NEXT_PUBLIC_URL as string;
+  
+  const manifest = {
+    accountAssociation: {
+      header: "eyJmaWQiOjg2NDc5MywidHlwZSI6ImF1dGgiLCJrZXkiOiIweDYwNzE4NGVkMTA3NDA5QjU5MTg0QTVEQUYzNDJmMDAzNDNCNWNjMDQifQ",
+      payload: "eyJkb21haW4iOiI4Yml0bWludGVyLnZlcmNlbC5hcHAifQ",
+      signature: "aRsAAmVQo17SubvqWgnIHW0vlDze4eWuOCaVKSvA6rFmtQ/eMAfiVHdZmZMS5eWQCFwzN161b6FGM0HFWAFx4hw="
+    },
+    baseBuilder: {
+      allowedAddresses: ["0xc0F52851fCAac0cac016432E5e11954632cd2fcB"]
+    },
+    miniapp: {
+      version: "1",
+      name: "8BitCoiner",
+      description: "Create and mint 8-bit inspired tokens with AI-generated art on Base.",
+      iconUrl: "https://8bitminter.vercel.app/logo.png",
+      homeUrl: "https://8bitminter.vercel.app",
+      imageUrl: "https://8bitminter.vercel.app/opengraph-image.png",
+      screenshotUrls: ["https://8bitminter.vercel.app/images/screenshot1.png"],
+      tags: ["nft", "tokens", "blockchain", "web3", "bit"],
+      primaryCategory: "art-creativity",
+      buttonTitle: "Create Token",
+      splashImageUrl: "https://8bitminter.vercel.app/logo.png",
+      splashBackgroundColor: "#181028",
+      subtitle: "Retro tokens on Base",
+      heroImageUrl: "https://8bitminter.vercel.app/opengraph-image.png",
+      tagline: "Mint retro tokens instantly",
+      ogTitle: "8BitCoiner",
+      ogDescription: "Create retro-styled tokens on the blockchain with AI-generated art",
+      ogImageUrl: "https://8bitminter.vercel.app/opengraph-image.png",
+      noindex: false
+    }
+  };
+
+  return Response.json(manifest);
+}

@@ -1,96 +1,77 @@
-"use client";
-
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "@fontsource/press-start-2p";
 import "@fontsource/vt323";
 import Providers from "./providers";
-import { useEffect, useState } from "react";
+
+export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_URL || "https://8bitminter.vercel.app"
+  ),
+  title: "8BitCoiner",
+  description: "Create and mint 8-bit inspired tokens with AI-generated art on Base.",
+  keywords: ["Base", "tokens", "blockchain", "web3", "8bit", "nft", "retro", "AI", "art"],
+  authors: [{ name: "8BitCoiner Team" }],
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+  },
+  openGraph: {
+    title: "8BitCoiner",
+    description: "Create and mint 8-bit inspired tokens with AI-generated art on Base.",
+    type: "website",
+    url: "https://8bitminter.vercel.app",
+    images: [
+      {
+        url: "https://8bitminter.vercel.app/opengraph-image.png",
+        width: 1200,
+        height: 630,
+        alt: "8BitCoiner",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "8BitCoiner",
+    description: "Create retro-styled tokens on the blockchain with AI-generated art",
+    images: ["https://8bitminter.vercel.app/opengraph-image.png"],
+  },
+  other: {
+    "fc:miniapp": JSON.stringify({
+      version: "next",
+      imageUrl: "https://8bitminter.vercel.app/opengraph-image.png",
+      button: {
+        title: "Launch 8BitCoiner",
+        action: {
+          type: "launch_miniapp",
+          name: "8BitCoiner",
+          url: "https://8bitminter.vercel.app",
+          splashImageUrl: "https://8bitminter.vercel.app/splash.png",
+          splashBackgroundColor: "#181028"
+        }
+      }
+    })
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#181028",
+};
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  // Ensure URL doesn't end with a slash to avoid double slashes
-  const [baseUrl, setBaseUrl] = useState('https://8bitminter.vercel.app');
-  
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const url = (process.env.NEXT_PUBLIC_URL || window.location.origin).replace(/\/$/, '');
-      setBaseUrl(url);
-    }
-  }, []);
-  
-  // Define the Farcaster frame JSON
-  const frameJson = {
-    version: "next",
-    imageUrl: `${baseUrl}/opengraph-image.png`,
-    button: {
-      title: "Create Coin",
-      action: {
-        type: "launch_frame",
-        name: "8BitCoiner",
-        url: baseUrl,
-        splashImageUrl: `${baseUrl}/logo.png`,
-        splashBackgroundColor: "#181028"
-      }
-    }
-  };
-
-  // Define the Base mini-app embed metadata
-  const miniAppMeta = {
-    version: "next",
-    imageUrl: `${baseUrl}/opengraph-image.png`,
-    button: {
-      title: "Launch Mini App",
-      action: {
-        type: "launch_miniapp",
-        name: "8BitCoiner",
-        url: baseUrl
-      }
-    }
-  };
-  
   return (
     <html lang="en">
       <head>
-        <title>8BitCoiner</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-        <meta
-          name="description"
-          content="Create retro-styled tokens on the blockchain with AI-generated art"
-        />
-        <link rel="icon" href="/logo.png" />
-        <meta name="theme-color" content="#181028" />
-        <link rel="manifest" href="/manifest.json" />
-        
         {/* Farcaster manifest */}
         <link rel="farcaster-app-config" href="/.well-known/farcaster.json" />
         
-        {/* OpenGraph Meta Tags */}
-        <meta property="og:title" content="8BitCoiner" />
-        <meta
-          property="og:description"
-          content="Create retro-styled tokens on the blockchain with AI-generated art"
-        />
-        <meta property="og:image" content={`${baseUrl}/opengraph-image.png`} />
-        <meta property="og:url" content={baseUrl} />
-        <meta property="og:type" content="website" />
-        
-        {/* Twitter Meta Tags */}
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="8BitCoiner" />
-        <meta name="twitter:description" content="Create retro-style tokens on Base" />
-        <meta name="twitter:image" content={`${baseUrl}/opengraph-image.png`} />
-        
-        {/* Farcaster Frame configuration */}
-        <meta name="fc:frame" content={JSON.stringify(frameJson)} />
-        <meta name="fc:frame:image" content={`${baseUrl}/opengraph-image.png`} />
-        <meta name="fc:frame:button:1" content="Create Coin" />
-
-        {/* Base mini-app embed metadata */}
-        <meta name="fc:miniapp" content={JSON.stringify(miniAppMeta)} />
-
         {/* Allow embedding from anywhere */}
         <meta httpEquiv="X-Frame-Options" content="ALLOWALL" />
         <meta httpEquiv="Content-Security-Policy" content="frame-ancestors *" />

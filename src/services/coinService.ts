@@ -204,6 +204,27 @@ export class CoinService {
   }
 
   /**
+   * Get total count of coins for pagination
+   */
+  static async getTotalCoinsCount(): Promise<number> {
+    try {
+      const { count, error } = await supabase
+        .from('coins')
+        .select('*', { count: 'exact', head: true })
+
+      if (error) {
+        console.error('Error getting total coins count:', error)
+        return 0
+      }
+
+      return count || 0
+    } catch (error) {
+      console.error('❌ Failed to get total coins count:', error)
+      return 0
+    }
+  }
+
+  /**
    * Get coin statistics
    */
   static async getCoinStats(): Promise<{

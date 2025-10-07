@@ -65,6 +65,23 @@ const nextConfig = {
   async headers() {
     return [
       {
+        source: '/.well-known/farcaster.json',
+        headers: [
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*',
+          },
+          {
+            key: 'Content-Type',
+            value: 'application/json',
+          },
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=3600',
+          },
+        ],
+      },
+      {
         source: '/.well-known/(.*)',
         headers: [
           {

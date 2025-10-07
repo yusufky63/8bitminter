@@ -134,6 +134,8 @@ export default function RetroCoinExplorer({
     []
   );
   const [localCoinsLoading, setLocalCoinsLoading] = useState(false);
+  const [localTotalCoins, setLocalTotalCoins] = useState(0);
+  const [localHasMore, setLocalHasMore] = useState(false);
 
   const categories = ["All", "DeFi", "Gaming", "NFT", "Meme", "Utility"];
 
@@ -147,14 +149,30 @@ export default function RetroCoinExplorer({
     }
   }, [activePlatform, activeFilter]);
 
-  // Load local coins
-  const loadLocalCoins = async () => {
+  // Load local coins with pagination
+  const loadLocalCoins = async (page: number = 1, reset: boolean = true) => {
     setLoading(true);
     try {
-      const coins = await CoinService.getCoins();
-      setLocalCoins(coins);
-      // Load market data for local coins
-      await loadLocalCoinsMarketData(coins);
+      const offset = (page - 1) * localCoinsPerPage;
+      const coins = await CoinService.getCoins({
+        limit: localCoinsPerPage,
+        offset: offset
+      });
+      
+      // Get total count for pagination
+      const totalCount = await CoinService.getTotalCoinsCount();
+      setLocalTotalCoins(totalCount);
+      setLocalHasMore(offset + localCoinsPerPage < totalCount);
+      
+      if (reset) {
+        setLocalCoins(coins);
+        setLocalCoinsWithData([]);
+      } else {
+        setLocalCoins(prev => [...prev, ...coins]);
+      }
+      
+      // Load market data for current page coins only
+      await loadLocalCoinsMarketData(coins, reset);
     } catch (error) {
       console.error("Error loading local coins:", error);
       toast.error("Failed to load local coins");
@@ -164,11 +182,13 @@ export default function RetroCoinExplorer({
   };
 
   // Load market data for local coins using batch fetch
-  const loadLocalCoinsMarketData = async (coins: Coin[]) => {
+  const loadLocalCoinsMarketData = async (coins: Coin[], reset: boolean = true) => {
     setLocalCoinsLoading(true);
     try {
       if (coins.length === 0) {
-        setLocalCoinsWithData([]);
+        if (reset) {
+          setLocalCoinsWithData([]);
+        }
         return;
       }
 
@@ -306,7 +326,11 @@ export default function RetroCoinExplorer({
       console.log(
         `âœ… Successfully processed ${coinsWithMarketData.length} coins with market data`
       );
-      setLocalCoinsWithData(coinsWithMarketData);
+      if (reset) {
+        setLocalCoinsWithData(coinsWithMarketData);
+      } else {
+        setLocalCoinsWithData(prev => [...prev, ...coinsWithMarketData]);
+      }
     } catch (error) {
       console.error("âŒ Error loading local coins market data:", error);
 
@@ -329,7 +353,11 @@ export default function RetroCoinExplorer({
         marketCapDelta24h: 0,
       }));
 
-      setLocalCoinsWithData(fallbackData);
+      if (reset) {
+        setLocalCoinsWithData(fallbackData);
+      } else {
+        setLocalCoinsWithData(prev => [...prev, ...fallbackData]);
+      }
     } finally {
       setLocalCoinsLoading(false);
     }
@@ -351,6 +379,11 @@ export default function RetroCoinExplorer({
     setLocalCurrentPage(1); // Reset pagination when searching
     setCurrentPage(1); // Reset market data pagination too
     setTokenDetails(null); // Clear individual token details when searching
+    
+    // If search term is cleared, reload the first page
+    if (!e.target.value) {
+      loadLocalCoins(1, true);
+    }
   };
 
   // Get display coins based on platform
@@ -580,22 +613,30 @@ export default function RetroCoinExplorer({
         setIsLoading(false);
       }
     } else {
-      // Local platform search
-      const filteredResults = localCoinsWithData.filter(
-        (coin) =>
-          coin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          coin.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          coin.address.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-
-      if (filteredResults.length > 0) {
-        toast.success(
-          `Found ${filteredResults.length} coin(s) in your collection`
-        );
-      } else {
-        toast(`No coins found in your collection matching the search`, {
-          duration: 3000,
+      // Local platform search - search across all pages
+      try {
+        const searchResults = await CoinService.getCoins({
+          search: searchTerm,
+          limit: 50 // Get more results for search
         });
+        
+        if (searchResults.length > 0) {
+          // Load market data for search results
+          await loadLocalCoinsMarketData(searchResults, true);
+          setLocalCoins(searchResults);
+          toast.success(
+            `Found ${searchResults.length} coin(s) in your collection`
+          );
+        } else {
+          setLocalCoinsWithData([]);
+          setLocalCoins([]);
+          toast(`No coins found in your collection matching the search`, {
+            duration: 3000,
+          });
+        }
+      } catch (error) {
+        console.error("Error searching local coins:", error);
+        toast.error("Failed to search coins");
       }
 
       // Reset to first page when searching
@@ -644,17 +685,18 @@ export default function RetroCoinExplorer({
   };
 
   // Pagination functions for local coins
-  const localTotalPages = Math.ceil(
-    localCoinsWithData.length / localCoinsPerPage
-  );
+  const localTotalPages = Math.ceil(localTotalCoins / localCoinsPerPage);
 
   const getCurrentLocalCoins = () => {
-    const startIndex = (localCurrentPage - 1) * localCoinsPerPage;
-    return localCoinsWithData.slice(startIndex, startIndex + localCoinsPerPage);
+    // Since we're now loading data per page, just return the current page data
+    return localCoinsWithData;
   };
 
-  const changeLocalPage = (newPage: number) => {
+  const changeLocalPage = async (newPage: number) => {
+    if (newPage < 1 || newPage > localTotalPages) return;
+    
     setLocalCurrentPage(newPage);
+    await loadLocalCoins(newPage, true);
   };
 
   // Format functions
@@ -704,9 +746,6 @@ export default function RetroCoinExplorer({
               }`}
             >
               <span>Platform Coins</span>
-              <span className="text-xs bg-retro-darker/30 px-2 py-1 rounded">
-                {localCoins.length}
-              </span>
             </button>
 
             <button
@@ -977,25 +1016,22 @@ export default function RetroCoinExplorer({
   function renderCoinsSection() {
     if (loading || localCoinsLoading) {
       return (
-        <div className="text-center py-6">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-retro-primary mx-auto mb-4"></div>
-          <div className="text-retro-accent text-lg">
-            {loading ? "Loading coins..." : "Loading market data..."}
+        <div className="flex flex-col items-center justify-center py-8 border-2 border-retro-primary bg-black/20">
+          <div className="retro-loading mb-4">
+            <div></div>
+            <div></div>
+            <div></div>
           </div>
+          <p className="text-retro-secondary text-xs pixelated">
+            {loading ? "LOADING COINS..." : "LOADING MARKET DATA..."}
+          </p>
         </div>
       );
     }
 
-    // Apply search filter to local coins
-    let filteredLocalCoins = [...localCoinsWithData];
-    if (searchTerm) {
-      filteredLocalCoins = localCoinsWithData.filter(
-        (coin) =>
-          coin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          coin.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          coin.address.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
+    // With new pagination, we don't need client-side filtering for search
+    // Search is now handled server-side in performSearch function
+    const filteredLocalCoins = localCoinsWithData;
 
     if (filteredLocalCoins.length === 0) {
       return (
@@ -1021,15 +1057,8 @@ export default function RetroCoinExplorer({
       );
     }
 
-    // Get paginated filtered coins
-    const localFilteredTotalPages = Math.ceil(
-      filteredLocalCoins.length / localCoinsPerPage
-    );
-    const startIndex = (localCurrentPage - 1) * localCoinsPerPage;
-    const currentLocalCoins = filteredLocalCoins.slice(
-      startIndex,
-      startIndex + localCoinsPerPage
-    );
+    // With server-side pagination, we don't need client-side slicing
+    const currentLocalCoins = filteredLocalCoins;
 
     return (
       <div className="space-y-6">
@@ -1077,23 +1106,23 @@ export default function RetroCoinExplorer({
         </div>
 
         {/* Pagination */}
-        {filteredLocalCoins.length > localCoinsPerPage && (
+        {localTotalCoins > localCoinsPerPage && (
           <div className="flex justify-center items-center gap-1 mt-4">
             <RetroButton
               onClick={() => changeLocalPage(localCurrentPage - 1)}
-              disabled={localCurrentPage === 1}
+              disabled={localCurrentPage === 1 || localCoinsLoading}
               className="text-xs py-1 px-2"
             >
               Prev
             </RetroButton>
 
             <span className="text-xs text-retro-secondary mx-2">
-              Page {localCurrentPage} of {localFilteredTotalPages}
+              Page {localCurrentPage} of {localTotalPages}
             </span>
 
             <RetroButton
               onClick={() => changeLocalPage(localCurrentPage + 1)}
-              disabled={localCurrentPage === localFilteredTotalPages}
+              disabled={localCurrentPage === localTotalPages || localCoinsLoading}
               className="text-xs py-1 px-2"
             >
               Next
