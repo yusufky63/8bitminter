@@ -87,16 +87,7 @@ const nextConfig = {
         ],
       },
     ];
-  },
-  // Re-add rewrites to ensure .well-known path works
-  async rewrites() {
-    return [
-      {
-        source: '/.well-known/farcaster.json',
-        destination: '/api/farcaster.json',
-      },
-    ];
-  },
+  },  
 };
 
 export default nextConfig;
