@@ -1,7 +1,6 @@
 import { createPublicClient, http, formatEther } from "viem";
 import { base } from "viem/chains";
-import { getCoin, getOnchainCoinDetails } from "@zoralabs/coins-sdk";
-import { setApiKey } from "@zoralabs/coins-sdk";
+import { getCoin, setApiKey } from "@zoralabs/coins-sdk";
 
 // Initialize API key for production environments
 // Uses environment variable or allows manual override
@@ -90,22 +89,24 @@ export const getOnchainTokenDetails = async (
     
     console.log("Fetching coin details for:", tokenAddress);
     
-    // Use only Zora SDK's getOnchainCoinDetails as per documentation
-    console.log("=== CALLING ZORA getOnchainCoinDetails ===");
-    console.log("Parameters:", { coin: tokenAddress, publicClient, ...(userAddress && { user: userAddress }) });
+    // Use Zora SDK's getCoin function (getOnchainCoinDetails is not available in current SDK version)
+    console.log("=== CALLING ZORA getCoin ===");
+    console.log("Parameters:", { address: tokenAddress });
     
     let details;
     try {
-      details = await getOnchainCoinDetails({
-        coin: tokenAddress,
-        publicClient,
-        ...(userAddress && { user: userAddress })
-      });
+      const coinResponse = await getCoin({ address: tokenAddress });
       
-      console.log("=== getOnchainCoinDetails SUCCESS ===");
+      if (!coinResponse.data?.zora20Token) {
+        throw new Error("Coin not found in Zora system");
+      }
+      
+      details = coinResponse.data.zora20Token;
+      
+      console.log("=== getCoin SUCCESS ===");
       console.log("Raw details from Zora SDK:", details);
     } catch (error) {
-      console.error("=== getOnchainCoinDetails FAILED ===");
+      console.error("=== getCoin FAILED ===");
       console.error("Error:", error);
       console.error("This might mean the coin is not recognized by Zora yet or there's an API issue");
       
@@ -113,20 +114,19 @@ export const getOnchainTokenDetails = async (
       throw new Error(`Coin data unavailable from Zora: ${error.message}. The coin might not be ready for trading yet.`);
     }
 
-    // Format according to SDK documentation structure
+    // Format according to getCoin API response structure
     const tokenDetails = {
       address: details.address || tokenAddress,
       name: details.name || "Unknown Token",
       symbol: details.symbol || "???",
       decimals: details.decimals || 18,
-      totalSupply: formatOnchainDetail(details.totalSupply),
-      pool: details.pool ,
+      totalSupply: formatOnchainDetail(details.totalSupply || 0),
+      pool: details.pool || null,
       owners: details.owners || [],
       ownersCount: details.owners?.length || 0,
-      marketCap: formatOnchainDetail(details.marketCap),
-      liquidity: formatOnchainDetail(details.liquidity),
-      payoutRecipient:
-        details.payoutRecipient,
+      marketCap: formatOnchainDetail(details.marketCap || 0),
+      liquidity: formatOnchainDetail(details.liquidity || 0),
+      payoutRecipient: details.payoutRecipient || null,
       // Add user balance if available
       ...(details.balance
         ? {
@@ -161,7 +161,7 @@ export const getOnchainTokenDetails = async (
         raw: "0",
         formatted: "0",
       },
-      pool: details.pool,
+      pool: null,
       owners: [],
       ownersCount: 0,
       marketCap: {
@@ -172,7 +172,7 @@ export const getOnchainTokenDetails = async (
         raw: "0",
         formatted: "0",
       },
-      payoutRecipient: details.payoutRecipient,
+      payoutRecipient: null,
       fetchedAt: new Date().toISOString(),
       hasError: true,
       error: error.message,

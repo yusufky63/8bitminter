@@ -3,9 +3,16 @@
  * @module tradeCoin
  */
 
-import { tradeCoin, createTradeCall, setApiKey } from "@zoralabs/coins-sdk";
-import { ethers } from "ethers";
+import { tradeCoin, setApiKey } from "@zoralabs/coins-sdk";
 import { parseEther, parseUnits } from "viem";
+import { 
+  getZORATokenAddress, 
+  validateCoinForTrade, 
+  extractTradeFromLogs, 
+  checkETHBalance, 
+  checkTokenBalance, 
+  validateTradeBalance 
+} from './tradeUtils';
 
 // Initialize API key for production environments
 // Uses environment variable or allows manual override
@@ -22,122 +29,131 @@ const initializeApiKey = () => {
 // Call initialization on module load
 initializeApiKey();
 
+// USDC token address on Base network
+const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+
+// Re-export utility functions for backward compatibility
+export { 
+  getZORATokenAddress, 
+  validateCoinForTrade, 
+  extractTradeFromLogs, 
+  checkETHBalance, 
+  checkTokenBalance, 
+  validateTradeBalance 
+};
+
 /**
- * Validates if a coin is tradeable on Zora
- * @param {string} coinAddress - Coin address to validate
- * @returns {Promise<boolean>} Whether the coin is tradeable
+ * Retry mechanism for RPC rate limiting and temporary errors
+ * @param {Function} fn - Function to retry
+ * @param {number} maxRetries - Maximum number of retries
+ * @param {number} delay - Delay between retries in ms
+ * @returns {Promise} - Result of the function
  */
-export async function validateCoinForTrade(coinAddress) {
-  try {
-    // Import getCoin to check if coin exists and has necessary data
-    const { getCoin } = await import("@zoralabs/coins-sdk");
-    
-    // getCoin expects an object with address property, not just the address string
-    const coinData = await getCoin({ address: coinAddress });
-    
-    // Check if coin has necessary trading data
-    if (!coinData || !coinData.address) {
-      console.warn("Coin not found or invalid:", coinAddress);
-      return false;
+async function retryWithBackoff(fn, maxRetries = 3, delay = 1000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      const isRetryableError = 
+        error?.message?.includes('rate limited') ||
+        error?.message?.includes('Request is being rate limited') ||
+        error?.message?.includes('Internal Server Error') ||
+        error?.message?.includes('An internal error was received') ||
+        error?.message?.includes('timeout') ||
+        error?.message?.includes('network') ||
+        error?.message?.includes('500') ||
+        error?.message?.includes('502') ||
+        error?.message?.includes('503') ||
+        error?.message?.includes('504') ||
+        error?.message?.includes('InternalRpcError') ||
+        error?.message?.includes('RPC') ||
+        error?.message?.includes('connection') ||
+        error?.message?.includes('fetch') ||
+        error?.message?.includes('ECONNRESET') ||
+        error?.message?.includes('ETIMEDOUT');
+
+      if (isRetryableError && attempt < maxRetries) {
+        const backoffDelay = delay * Math.pow(2, attempt - 1); // Exponential backoff
+        console.log(`🔄 Retry attempt ${attempt}/${maxRetries} after ${backoffDelay}ms. Error:`, error.message);
+        await new Promise(resolve => setTimeout(resolve, backoffDelay));
+        continue;
+      }
+      
+      // If not retryable or max retries reached, throw the error
+      throw error;
     }
-    
-    // Additional validation for Zora coins
-    // Check if it's a proper Zora coin with the expected structure
-    if (coinData.contractType !== 'ERC20z' && !coinData.symbol) {
-      console.warn("Coin may not be a valid Zora coin:", coinAddress);
-      return false;
-    }
-    
-    console.log("Coin validation successful:", {
-      name: coinData.name || "Unknown",
-      symbol: coinData.symbol || "Unknown",
-      address: coinData.address
-    });
-    return true;
-  } catch (error) {
-    console.error("Coin validation failed:", error.message);
-    // For API validation errors, skip validation and allow trade to proceed
-    // The trade will fail with better error messages if the coin is truly invalid
-    if (error.message?.includes("400") || error.message?.includes("invalid data") || 
-        error.message?.includes("required property") || error.message?.includes("fetch") || 
-        error.message?.includes("network")) {
-      console.warn("API validation failed, allowing trade to proceed - trade will handle validation");
-      return true;
-    }
-    return false;
   }
 }
 
+
 /**
- * Executes a trade using the simplest Zora SDK approach
+ * Universal trade function that supports all trading pairs
  * @param {Object} params - Trade parameters
- * @param {string} params.direction - Trade direction ('buy' or 'sell')
- * @param {string} params.coinAddress - Coin address
- * @param {string} params.amountIn - Amount to trade (ETH for buy, tokens for sell)
- * @param {string} params.recipient - Recipient address
- * @param {string} [params.referrer] - Platform referrer address
+ * @param {Object} params.sellToken - Token to sell { type: "eth" } | { type: "erc20", address: "0x..." }
+ * @param {Object} params.buyToken - Token to buy { type: "eth" } | { type: "erc20", address: "0x..." }
+ * @param {bigint} params.amountIn - Amount to sell (in token's smallest unit)
+ * @param {string} params.sender - Sender address
+ * @param {string} [params.recipient] - Recipient address (defaults to sender)
  * @param {number} [params.slippage] - Slippage tolerance (default: 0.05 = 5%)
  * @param {Object} params.walletClient - Viem wallet client
  * @param {Object} params.publicClient - Viem public client
  * @param {Object} params.account - Account object
+ * @param {Function} [params.switchChain] - Network switch function
+ * @param {boolean} [params.validateTransaction] - Validate transaction (default: true)
  * @returns {Promise<Object>} Transaction receipt
  */
-export async function executeTrade({
-  direction,
-  coinAddress,
+export async function executeUniversalTrade({
+  sellToken,
+  buyToken,
   amountIn,
+  sender,
   recipient,
-  referrer = "0xbFA6A45Dd534d39dF47A3F3D2f2b6E88416f9831",
   slippage = 0.05,
   walletClient,
   publicClient,
-  account
+  account,
+  switchChain,
+  validateTransaction = true,
+  creatorAddress = null
 }) {
-  try {
-    console.log("=== ZORA TRADE EXECUTION START ===");
-    console.log("Direction:", direction);
-    console.log("Coin Address:", coinAddress);
-    console.log("Amount In:", amountIn);
-    console.log("Recipient:", recipient);
-    console.log("Account:", account);
+  // Wrap the entire trade execution in retry mechanism
+  return await retryWithBackoff(async () => {
+    console.log("=== UNIVERSAL TRADE EXECUTION START ===");
+    console.log("Sell Token:", sellToken);
+    console.log("Buy Token:", buyToken);
+    console.log("Amount In:", amountIn.toString());
+    console.log("Sender:", sender);
+    console.log("Recipient:", recipient || sender);
 
-    // Validate Base network requirement (Zora SDK only supports Base mainnet)
+    // Validate Base network requirement
     const chainId = await walletClient.getChainId();
     console.log("Current chain ID:", chainId);
     
     if (chainId !== 8453) {
-      throw new Error("Zora coins trading only supported on Base network (Chain ID: 8453). Please switch to Base network.");
-    }
-
-    // Determine sender and recipient addresses
-    const senderAddress = (typeof account === 'string' ? account : account?.address) || recipient;
-    const recipientAddress = recipient || senderAddress;
-
-    // Compute amountIn based on direction (ETH uses parseEther, ERC20 uses parseUnits with token decimals)
-    let amountInBigInt;
-    if (direction === "buy") {
-      amountInBigInt = parseEther(amountIn.toString());
-    } else {
-      // Fetch token decimals for accurate unit conversion when selling
-      try {
-        const erc20DecimalsAbi = [{ constant: true, inputs: [], name: 'decimals', outputs: [{ name: '', type: 'uint8' }], type: 'function' }];
-        const tokenDecimals = await publicClient.readContract({ address: coinAddress, abi: erc20DecimalsAbi, functionName: 'decimals' });
-        amountInBigInt = parseUnits(amountIn.toString(), Number(tokenDecimals ?? 18));
-      } catch (decErr) {
-        console.warn('Failed to fetch token decimals; defaulting to 18', decErr);
-        amountInBigInt = parseUnits(amountIn.toString(), 18);
+      console.log(`Chain mismatch: Connected to chain ${chainId}, but Base (8453) is required. Attempting to switch...`);
+      
+      if (switchChain) {
+        // Simple network switch check - you can implement checkAndSwitchNetwork if needed
+        try {
+          await switchChain({ chainId: 8453 });
+          // Wait a moment for the network switch to complete
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (switchError) {
+          throw new Error("Please switch to Base network manually in your wallet.");
+        }
+      } else {
+        throw new Error("Zora coins trading only supported on Base network (Chain ID: 8453). Please switch to Base network.");
       }
     }
 
-    // Trade parameters exactly as per Zora documentation
+    // Prepare trade parameters
     const tradeParameters = {
-      sell: direction === "buy" ? { type: "eth" } : { type: "erc20", address: coinAddress },
-      buy: direction === "buy" ? { type: "erc20", address: coinAddress } : { type: "eth" },
-      amountIn: amountInBigInt,
+      sell: sellToken,
+      buy: buyToken,
+      amountIn: amountIn,
       slippage: slippage,
-      sender: senderAddress,
-      signer: senderAddress,
-      recipient: recipientAddress,
+      sender: sender,
+      recipient: recipient || sender
     };
 
     console.log("=== TRADE PARAMETERS ===");
@@ -146,316 +162,257 @@ export async function executeTrade({
     console.log("Amount In (BigInt):", tradeParameters.amountIn.toString());
     console.log("Slippage:", tradeParameters.slippage);
     console.log("Sender:", tradeParameters.sender);
+    console.log("Recipient:", tradeParameters.recipient);
 
-    // First, try to create a quote so we can surface better errors if it fails
-    console.log("=== PREVIEW QUOTE (createTradeCall) ===");
-    try {
-      const quote = await createTradeCall(tradeParameters);
-      console.log("Quote OK:", quote);
-    } catch (qErr) {
-      console.error("Quote error details:", qErr);
-      // Normalize common quote failures
-      const qMsg = (qErr?.message || "Quote failed");
-      // Provide user-friendly hint
-      throw new Error(
-        qMsg.includes("500") || qMsg.toLowerCase().includes("internal")
-          ? "Quote failed (Zora API). If this is a newly created coin, wait ~2-5 minutes and try again."
-          : `Quote failed: ${qMsg}`
-      );
-    }
-
-    // Call tradeCoin function exactly as documented
+    // Execute the trade using Zora SDK tradeCoin function
     console.log("=== CALLING ZORA tradeCoin ===");
     
     const result = await tradeCoin({
       tradeParameters,
       walletClient,
-      account: senderAddress,
+      account: walletClient.account || account,
       publicClient,
-      validateTransaction: false
+      validateTransaction
     });
 
     console.log("=== TRADE SUCCESS ===");
     console.log("Result:", result);
     return result;
+  }, 3, 2000); // 3 retries with 2 second base delay
+}
 
+/**
+ * Helper function to get token decimals
+ * @param {string} tokenAddress - Token address
+ * @param {Object} publicClient - Viem public client
+ * @returns {Promise<number>} Token decimals
+ */
+async function getTokenDecimals(tokenAddress, publicClient) {
+  try {
+    const erc20DecimalsAbi = [{ 
+      constant: true, 
+      inputs: [], 
+      name: 'decimals', 
+      outputs: [{ name: '', type: 'uint8' }], 
+      type: 'function' 
+    }];
+    return await publicClient.readContract({ 
+      address: tokenAddress, 
+      abi: erc20DecimalsAbi, 
+      functionName: 'decimals' 
+    });
   } catch (error) {
-    console.error("=== TRADE ERROR ===");
-    console.error("Error object:", error);
-    console.error("Error message:", error.message);
-    console.error("Error stack:", error.stack);
-    
-    // Specific error handling for common issues
-    if (error.message?.includes("Quote failed") || error.message?.includes("500")) {
-      throw new Error("Bu coin henüz trading için hazır değil. Coin oluşturulduktan sonra birkaç dakika bekleyin ve tekrar deneyin. Zora sisteminin coin'i tanıması gerekiyor.");
-    }
-    
-    if (error.message?.includes("Internal Server Error")) {
-      throw new Error("Zora API şu anda erişilemiyor. Lütfen birkaç dakika sonra tekrar deneyin.");
-    }
-    
-    // Re-throw with original error message for debugging
-    throw new Error(`Zora trade failed: ${error.message}`);
+    console.warn('Failed to fetch token decimals; defaulting to 18', error);
+    return 18;
   }
 }
 
 /**
- * Extracts trade event from transaction logs
- * @param {object} receipt - Transaction receipt
- * @param {string} direction - Trade direction
- * @returns {object|null} Trade event details
+ * Simplified trade function for backward compatibility
+ * @param {Object} params - Trade parameters
+ * @param {string} params.direction - Trade direction ('buy' or 'sell')
+ * @param {string} params.coinAddress - Coin address
+ * @param {string} params.amountIn - Amount to trade (ETH for buy, tokens for sell)
+ * @param {string} params.recipient - Recipient address
+ * @param {number} [params.slippage] - Slippage tolerance (default: 0.05 = 5%)
+ * @param {Object} params.walletClient - Viem wallet client
+ * @param {Object} params.publicClient - Viem public client
+ * @param {Object} params.account - Account object
+ * @param {Function} [params.switchChain] - Network switch function
+ * @param {string} [params.currency] - Currency to use for buying ('ETH' or 'USDC')
+ * @returns {Promise<Object>} Transaction receipt
  */
-export const extractTradeFromLogs = (receipt, direction) => {
-  try {
-    // Use getCoinCreateFromLogs as a fallback - the new SDK may not have trade log extraction
-    // We'll extract the trade info manually from receipt logs
-    if (receipt && receipt.logs) {
-      return {
-        success: true,
-        transactionHash: receipt.transactionHash,
-        blockNumber: receipt.blockNumber,
-        logs: receipt.logs
-      };
-    }
-    return null;
-  } catch (error) {
-    console.error("Trade event extraction error:", error);
-    return null;
-  }
-};
-
-/**
- * Checks ETH balance
- * @param {string} userAddress - User address
- * @param {object} publicClient - Viem public client
- * @returns {Promise<bigint>} ETH balance (wei)
- */
-export const checkETHBalance = async (userAddress, publicClient) => {
-  try {
-    if (!userAddress || !userAddress.startsWith("0x")) {
-      throw new Error("Valid user address is required");
-    }
-    
-    if (!publicClient) {
-      throw new Error("Valid publicClient is required");
-    }
-    
-    // Implement retry mechanism with exponential backoff
-    let retries = 0;
-    const maxRetries = 5;
-    const baseDelay = 1000; // 1 second initial delay
-    
-    while (retries <= maxRetries) {
-      try {
-        const balance = await publicClient.getBalance({
-          address: userAddress,
-        });
-        
-        return balance;
-      } catch (error) {
-        // Check if it's a rate limit error
-        const isRateLimit = 
-          error.message?.includes("rate limit") || 
-          error.message?.includes("over rate limit") || 
-          error.details?.includes("rate limit") ||
-          error.code === 429 ||
-          error.status === 429;
-        
-        // If we've reached max retries or it's not a rate limit error, throw
-        if (retries >= maxRetries || !isRateLimit) {
-          throw error;
-        }
-        
-        // Calculate exponential backoff delay with jitter
-        const delay = baseDelay * Math.pow(2, retries) + Math.random() * 1000;
-        console.log(`Rate limit hit. Retrying in ${Math.round(delay/1000)}s... (Attempt ${retries + 1}/${maxRetries})`);
-        
-        // Wait for the calculated delay
-        await new Promise(resolve => setTimeout(resolve, delay));
-        
-        // Increment retry counter
-        retries++;
-      }
-    }
-  } catch (error) {
-    console.error("ETH balance check error:", error);
-    throw error;
-  }
-};
-
-/**
- * Checks token balance
- * @param {string} userAddress - User address
- * @param {string} tokenAddress - Token address
- * @param {object} publicClient - Viem public client
- * @returns {Promise<bigint>} Token balance
- */
-export const checkTokenBalance = async (
-  userAddress,
-  tokenAddress,
-  publicClient
-) => {
-  try {
-    if (
-      !userAddress ||
-      !userAddress.startsWith("0x") ||
-      !tokenAddress ||
-      !tokenAddress.startsWith("0x")
-    ) {
-      throw new Error("Valid addresses are required");
-    }
-    
-    if (!publicClient) {
-      throw new Error("Valid publicClient is required");
-    }
-    
-    const erc20ABI = [
-      {
-        constant: true,
-        inputs: [{ name: "owner", type: "address" }],
-        name: "balanceOf",
-        outputs: [{ name: "balance", type: "uint256" }],
-        type: "function",
-      },
-      {
-        constant: true,
-        inputs: [],
-        name: "decimals",
-        outputs: [{ name: "", type: "uint8" }],
-        type: "function",
-      },
-    ];
-    
-    // Implement retry mechanism with exponential backoff
-    let retries = 0;
-    const maxRetries = 5;
-    const baseDelay = 1000; // 1 second initial delay
-    
-    while (retries <= maxRetries) {
-      try {
-        const balance = await publicClient.readContract({
-          address: tokenAddress,
-          abi: erc20ABI,
-          functionName: "balanceOf",
-          args: [userAddress],
-        });
-        
-        return balance;
-      } catch (error) {
-        // Check if it's a rate limit error
-        const isRateLimit = 
-          error.message?.includes("rate limit") || 
-          error.message?.includes("over rate limit") || 
-          error.details?.includes("rate limit") ||
-          error.code === 429 ||
-          error.status === 429;
-        
-        // If we've reached max retries or it's not a rate limit error, throw
-        if (retries >= maxRetries || !isRateLimit) {
-          throw error;
-        }
-        
-        // Calculate exponential backoff delay with jitter
-        const delay = baseDelay * Math.pow(2, retries) + Math.random() * 1000;
-        console.log(`Rate limit hit. Retrying in ${Math.round(delay/1000)}s... (Attempt ${retries + 1}/${maxRetries})`);
-        
-        // Wait for the calculated delay
-        await new Promise(resolve => setTimeout(resolve, delay));
-        
-        // Increment retry counter
-        retries++;
-      }
-    }
-  } catch (error) {
-    console.error("Token balance check error:", error);
-    throw error;
-  }
-};
-
-/**
- * Validates balance sufficiency for trade
- * @param {string} userAddress - User address
- * @param {string} coinAddress - Coin address
- * @param {string} tradeType - Trade type ('buy' or 'sell')
- * @param {bigint} amount - Trade amount
- * @param {object} publicClient - Viem public client
- * @returns {Promise<object>} Validation result
- */
-export const validateTradeBalance = async (
-  userAddress,
+export async function executeTrade({
+  direction,
   coinAddress,
-  tradeType,
-  amount,
-  publicClient
-) => {
-  try {
-    if (!userAddress || !userAddress.startsWith("0x")) {
-      return {
-        isValid: false,
-        currentBalance: 0n,
-        message: "Valid user address is required",
-      };
+  amountIn,
+  recipient,
+  slippage = 0.05,
+  walletClient,
+  publicClient,
+  account,
+  switchChain,
+  creatorAddress = null,
+  currency = 'ETH'
+}) {
+  // Determine sender address
+  const senderAddress = (typeof account === 'string' ? account : account?.address) || recipient;
+  
+  let sellToken, buyToken, amountInBigInt;
+  
+  if (direction === 'buy') {
+    // Buying coin with ETH or USDC
+    if (currency === 'USDC') {
+      sellToken = { type: "erc20", address: USDC_ADDRESS };
+      amountInBigInt = parseUnits(amountIn.toString(), 6); // USDC has 6 decimals
+    } else {
+      sellToken = { type: "eth" };
+      amountInBigInt = parseEther(amountIn.toString());
     }
-    
-    if (!amount || amount <= 0n) {
-      return {
-        isValid: false,
-        currentBalance: 0n,
-        message: "Valid trade amount is required",
-      };
-    }
-
-    if (tradeType === "buy") {
-      const ethBalance = await checkETHBalance(userAddress, publicClient);
-      const gasReserve = 5n * 10n ** 13n; // 0.00005 ETH (reduced gas reserve)
-      const availableBalance =
-        ethBalance > gasReserve ? ethBalance - gasReserve : 0n;
-      
-      if (availableBalance < amount) {
-        return {
-          isValid: false,
-          currentBalance: ethBalance,
-          message: `Insufficient ETH balance. Your balance: ${ethers.formatEther(
-            ethBalance
-          )} ETH, required: ~${ethers.formatEther(
-            amount + gasReserve
-          )} ETH (trade + gas)`,
-        };
-      }
-    } else if (tradeType === "sell") {
-      // Check token balance for sells
-      const tokenBalance = await checkTokenBalance(userAddress, coinAddress, publicClient);
-      
-      if (tokenBalance < amount) {
-        return {
-          isValid: false,
-          currentBalance: tokenBalance,
-          message: `Insufficient token balance. Your balance: ${ethers.formatUnits(
-            tokenBalance, 18
-          )}, required: ${ethers.formatUnits(amount, 18)}`,
-        };
-      }
-      
-      // Also check if user has enough ETH for gas
-      const ethBalance = await checkETHBalance(userAddress, publicClient);
-      const gasReserve = 5n * 10n ** 13n; // 0.00005 ETH (reduced gas reserve) for gas
-      
-      if (ethBalance < gasReserve) {
-        return {
-          isValid: false,
-          currentBalance: ethBalance,
-          message: `Insufficient ETH for gas fees. You need at least 0.00005 ETH for gas.`,
-        };
-      }
-    }
-    
-    return {
-      isValid: true,
-      currentBalance: 0n,
-      message: "Sufficient balance for trade",
-    };
-  } catch (error) {
-    console.error("Balance validation error:", error);
-    throw error;
+    buyToken = { type: "erc20", address: coinAddress };
+  } else {
+    // Selling coin for ETH
+    const tokenDecimals = await getTokenDecimals(coinAddress, publicClient);
+    sellToken = { type: "erc20", address: coinAddress };
+    buyToken = { type: "eth" };
+    amountInBigInt = parseUnits(amountIn.toString(), Number(tokenDecimals));
   }
-};
+
+  return await executeUniversalTrade({
+    sellToken,
+    buyToken,
+    amountIn: amountInBigInt,
+    sender: senderAddress,
+    recipient: recipient || senderAddress,
+    slippage,
+    walletClient,
+    publicClient,
+    account,
+    switchChain,
+    creatorAddress
+  });
+}
+
+/**
+ * Executes a trade between two ERC20 tokens (e.g., USDC to Creator Coin)
+ * @param {Object} params - Trade parameters
+ * @param {string} params.sellTokenAddress - Address of token to sell
+ * @param {string} params.buyTokenAddress - Address of token to buy
+ * @param {bigint} params.amountIn - Amount to sell (in token's smallest unit)
+ * @param {string} params.recipient - Recipient address
+ * @param {number} params.slippage - Slippage tolerance (0-1)
+ * @param {Object} params.walletClient - Wallet client
+ * @param {Object} params.publicClient - Public client
+ * @param {Object} params.account - Account object
+ * @param {Function} [params.switchChain] - Network switch function
+ * @returns {Promise<Object>} Transaction receipt
+ */
+export async function executeERC20Trade({
+  sellTokenAddress,
+  buyTokenAddress,
+  amountIn,
+  recipient,
+  slippage = 0.05,
+  walletClient,
+  publicClient,
+  account,
+  switchChain,
+  creatorAddress = null
+}) {
+  const senderAddress = (typeof account === 'string' ? account : account?.address) || recipient;
+  
+  return await executeUniversalTrade({
+    sellToken: { type: "erc20", address: sellTokenAddress },
+    buyToken: { type: "erc20", address: buyTokenAddress },
+    amountIn: amountIn,
+    sender: senderAddress,
+    recipient: recipient || senderAddress,
+    slippage,
+    walletClient,
+    publicClient,
+    account,
+    switchChain,
+    creatorAddress
+  });
+}
+
+/**
+ * Helper function to create trade parameters for ETH to any token
+ * @param {string} tokenAddress - Token address to buy
+ * @param {string} ethAmount - ETH amount as string
+ * @param {string} sender - Sender address
+ * @param {string} [recipient] - Recipient address
+ * @param {number} [slippage] - Slippage tolerance
+ * @returns {Object} Trade parameters
+ */
+export function createETHToTokenTrade(tokenAddress, ethAmount, sender, recipient, slippage = 0.05) {
+  return {
+    sellToken: { type: "eth" },
+    buyToken: { type: "erc20", address: tokenAddress },
+    amountIn: parseEther(ethAmount),
+    sender,
+    recipient: recipient || sender,
+    slippage
+  };
+}
+
+/**
+ * Helper function to create trade parameters for USDC to any token
+ * @param {string} tokenAddress - Token address to buy
+ * @param {string} usdcAmount - USDC amount as string
+ * @param {string} sender - Sender address
+ * @param {string} [recipient] - Recipient address
+ * @param {number} [slippage] - Slippage tolerance
+ * @returns {Object} Trade parameters
+ */
+export function createUSDCToTokenTrade(tokenAddress, usdcAmount, sender, recipient, slippage = 0.05) {
+  return {
+    sellToken: { type: "erc20", address: USDC_ADDRESS },
+    buyToken: { type: "erc20", address: tokenAddress },
+    amountIn: parseUnits(usdcAmount, 6), // USDC has 6 decimals
+    sender,
+    recipient: recipient || sender,
+    slippage
+  };
+}
+
+/**
+ * Helper function to create trade parameters for any token to ETH
+ * @param {string} tokenAddress - Token address to sell
+ * @param {string} tokenAmount - Token amount as string
+ * @param {number} tokenDecimals - Token decimals
+ * @param {string} sender - Sender address
+ * @param {string} [recipient] - Recipient address
+ * @param {number} [slippage] - Slippage tolerance
+ * @returns {Object} Trade parameters
+ */
+export function createTokenToETHTrade(tokenAddress, tokenAmount, tokenDecimals, sender, recipient, slippage = 0.05) {
+  return {
+    sellToken: { type: "erc20", address: tokenAddress },
+    buyToken: { type: "eth" },
+    amountIn: parseUnits(tokenAmount, tokenDecimals),
+    sender,
+    recipient: recipient || sender,
+    slippage
+  };
+}
+
+/**
+ * Helper function to create trade parameters for token to token
+ * @param {string} sellTokenAddress - Token address to sell
+ * @param {string} buyTokenAddress - Token address to buy
+ * @param {bigint} amountIn - Amount to sell (in smallest unit)
+ * @param {string} sender - Sender address
+ * @param {string} [recipient] - Recipient address
+ * @param {number} [slippage] - Slippage tolerance
+ * @returns {Object} Trade parameters
+ */
+export function createTokenToTokenTrade(sellTokenAddress, buyTokenAddress, amountIn, sender, recipient, slippage = 0.05) {
+  return {
+    sellToken: { type: "erc20", address: sellTokenAddress },
+    buyToken: { type: "erc20", address: buyTokenAddress },
+    amountIn,
+    sender,
+    recipient: recipient || sender,
+    slippage
+  };
+}
+
+/**
+ * Execute trade with pre-built parameters
+ * @param {Object} tradeParams - Trade parameters from helper functions
+ * @param {Object} clients - Wallet and public clients
+ * @param {Object} account - Account object
+ * @param {Function} [switchChain] - Network switch function
+ * @returns {Promise<Object>} Transaction receipt
+ */
+export async function executeTradeWithParams(tradeParams, clients, account, switchChain, creatorAddress = null) {
+  return await executeUniversalTrade({
+    ...tradeParams,
+    walletClient: clients.walletClient,
+    publicClient: clients.publicClient,
+    account,
+    switchChain,
+    creatorAddress
+  });
+}

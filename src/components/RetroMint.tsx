@@ -12,27 +12,20 @@ interface RetroMintProps {
   description: string;
   imageUrl: string;
   displayImageUrl: string;
-  isPurchaseEnabled: boolean;
-  selectedPurchaseAmount: string;
-  selectedPurchasePercentage: number;
-  usdValue: string;
-  isCustomAmount: boolean;
+  // Removed purchase parameters - no longer supported in SDK v2
   ownersAddresses: string[];
   newOwnerAddress: string;
   isConnected: boolean;
   isLoading: boolean;
   isWalletReady?: boolean;
-  selectedCurrency: number;
-  onPurchaseToggle: () => void;
-  onPercentageChange: (percentage: number) => void;
-  onCustomAmountChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  selectedCurrency: string;
   onNewOwnerAddressChange: (address: string) => void;
   onAddOwner: () => void;
   onRemoveOwner: (address: string) => void;
   onConnect: () => void;
   onCreateCoin: () => void;
   onBack: () => void;
-  onCurrencyChange: (currency: number) => void;
+  onCurrencyChange: (currency: string) => void;
 }
 
 export function RetroMint({
@@ -40,20 +33,13 @@ export function RetroMint({
   symbol,
   description,
   displayImageUrl,
-  isPurchaseEnabled,
-  selectedPurchaseAmount,
-  selectedPurchasePercentage,
-  usdValue,
-  isCustomAmount,
+  // Removed purchase parameters - no longer supported in SDK v2
   ownersAddresses,
   newOwnerAddress,
   isConnected,
   isLoading,
   isWalletReady = false,
   selectedCurrency,
-  onPurchaseToggle,
-  onPercentageChange,
-  onCustomAmountChange,
   onNewOwnerAddressChange,
   onAddOwner,
   onRemoveOwner,
@@ -63,7 +49,6 @@ export function RetroMint({
   onCurrencyChange
 }: RetroMintProps) {
   const isDisabled = !isWalletReady;
-  const [useCustomAmount, setUseCustomAmount] = useState(false);
 
   // Primary action: if wallet is not ready, trigger connect; else create coin
   const handlePrimaryAction = () => {
@@ -73,31 +58,6 @@ export function RetroMint({
       onConnect();
     }
   };
-  
-  // Handle percentage button click
-  const handlePercentageClick = (percentage: number) => {
-    // Ensure we're in percentage mode
-    setUseCustomAmount(false);
-    
-    // Update the percentage
-    onPercentageChange(percentage);
-  };
-  
-  // Toggle custom amount mode
-  const toggleCustomAmount = () => {
-    const newValue = !useCustomAmount;
-    setUseCustomAmount(newValue);
-    
-    // If switching to percentage mode, trigger percentage change to update amount
-    if (!newValue) {
-      onPercentageChange(selectedPurchasePercentage);
-    }
-  };
-
-  // Sync local state with parent state when needed
-  useEffect(() => {
-    setUseCustomAmount(isCustomAmount);
-  }, [isCustomAmount]);
 
   return (
     <RetroStepScreen
@@ -156,100 +116,7 @@ export function RetroMint({
         
         {/* Currency selection removed per requirements; default currency is used */}
         
-        <RetroDivider text="PURCHASE SETTINGS" />
-        
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <label className="retro-label">INITIAL PURCHASE</label>
-            
-            <label className="inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                className="sr-only peer"
-                checked={isPurchaseEnabled}
-                onChange={onPurchaseToggle}
-              />
-              <div className="relative w-11 h-6 bg-retro-dark border-2 border-retro-primary peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[0.2rem] after:left-[0.2rem] after:bg-retro-primary after:border after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
-              <span className="ml-2 text-xs font-mono text-retro-accent">
-                {isPurchaseEnabled ? "ENABLED" : "DISABLED"}
-              </span>
-            </label>
-          </div>
-          
-          {isPurchaseEnabled && (
-            <div className="mb-5">
-              <div className="flex justify-between mb-2">
-                <label className="font-mono text-xs text-retro-accent">INITIAL PURCHASE AMOUNT</label>
-                <span className="font-mono text-xs text-retro-accent">≈ ${usdValue} USD</span>
-              </div>
-              
-              {/* Input mode toggle */}
-              <div className="flex items-center justify-end mb-2">
-                <span className="text-xs font-mono text-retro-accent mr-2">
-                  {useCustomAmount ? "CUSTOM AMOUNT" : "PERCENTAGE"}
-                </span>
-                <label className="inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={useCustomAmount}
-                    onChange={toggleCustomAmount}
-                  />
-                  <div className="relative w-9 h-5 bg-retro-dark border-2 border-retro-primary peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[0.1rem] after:left-[0.1rem] after:bg-retro-primary after:border after:rounded-full after:h-3 after:w-3 after:transition-all"></div>
-                </label>
-              </div>
-              
-              {!useCustomAmount ? (
-                <>
-                  {/* Slider for percentage selection */}
-                  <input
-                    type="range"
-                    min="1"
-                    max="99"
-                    value={selectedPurchasePercentage}
-                    onChange={(e) => onPercentageChange(parseInt(e.target.value))}
-                    className="retro-slider w-full mb-3"
-                  />
-                  
-                  {/* Percentage buttons */}
-                  <div className="grid grid-cols-4 gap-2 mb-3">
-                    {[10, 25, 50, 99].map((percent) => (
-                      <RetroButton
-                        key={percent}
-                        onClick={() => handlePercentageClick(percent)}
-                        className={`text-xs ${selectedPurchasePercentage === percent ? 'bg-retro-primary' : 'bg-transparent border border-retro-primary'}`}
-                      >
-                        {percent === 99 ? "Max" : `${percent}%`}
-                      </RetroButton>
-                    ))}
-                  </div>
-                </>
-              ) : null}
-              
-              {/* ETH input field */}
-              <div className="relative mb-1">
-                <input
-                  type="number"
-                  step="0.001"
-                  min="0.001"
-                  className={`retro-input w-full pr-16 text-sm ${!useCustomAmount ? 'opacity-80' : ''}`}
-                  value={selectedPurchaseAmount}
-                  onChange={onCustomAmountChange}
-                  disabled={!useCustomAmount}
-                />
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-retro-primary font-mono bg-retro-dark px-1">
-                  ETH
-                </div>
-              </div>
-              
-              <p className="text-xs text-retro-secondary mt-1 mb-4 font-mono">
-                {useCustomAmount 
-                  ? "* ENTER CUSTOM ETH AMOUNT FOR INITIAL LIQUIDITY" 
-                  : "* PERCENTAGE OF YOUR ETH BALANCE FOR LIQUIDITY"}
-              </p>
-            </div>
-          )}
-        </div>
+        {/* Removed purchase settings - no longer supported in SDK v2 */}
         
         <RetroDivider text="CO-OWNERS (OPTIONAL)" />
         

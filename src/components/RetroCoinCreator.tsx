@@ -34,7 +34,7 @@ import { getCoinCategories } from "../services/aiService.js";
 import {
   createZoraCoin,
   getCoinAddressFromReceipt,
-  DeployCurrency,
+  CreateConstants,
 } from "../services/sdk/getCreateCoin.js";
 import { CoinService, type CreateCoinData } from "../services/coinService";
 
@@ -136,19 +136,11 @@ export default function RetroCoinCreator() {
     imageUrl: "",
   });
 
-  // Purchase amount state
-  const [selectedPurchaseAmount, setSelectedPurchaseAmount] =
-    useState<string>("0.01");
-  const [selectedPurchasePercentage, setSelectedPurchasePercentage] =
-    useState<number>(10);
-  const [userEthBalance, setUserEthBalance] = useState<bigint>(BigInt(0));
-  const [ethToUsdRate, setEthToUsdRate] = useState<number>(0);
-  const [isCustomAmount, setIsCustomAmount] = useState<boolean>(false);
-  const [isPurchaseEnabled, setIsPurchaseEnabled] = useState<boolean>(false);
+  // Removed initial purchase state - no longer supported in SDK v2
   const [ownersAddresses, setOwnersAddresses] = useState<string[]>([]);
   const [newOwnerAddress, setNewOwnerAddress] = useState<string>("");
-  const [selectedCurrency, setSelectedCurrency] = useState<number>(
-    DeployCurrency.ZORA
+  const [selectedCurrency, setSelectedCurrency] = useState<string>(
+    CreateConstants.ContentCoinCurrencies.ZORA
   );
   const [platformReferrer, setPlatformReferrer] = useState<string>(
     "0xbFA6A45Dd534d39dF47A3F3D2f2b6E88416f9831"
@@ -248,89 +240,11 @@ export default function RetroCoinCreator() {
     }
   }, [connectors]);
 
-  // Get ETH price in USD with cache
-  const ethPriceCache: { value: number | null; timestamp: number } = {
-    value: null,
-    timestamp: 0,
-  };
-  const CACHE_DURATION_MS = 60 * 1000; // 1 minute
+  // Removed ETH price fetching - no longer needed without initial purchase
 
-  const fetchEthPrice = useCallback(async () => {
-    const now = Date.now();
-    if (
-      ethPriceCache.value !== null &&
-      now - ethPriceCache.timestamp < CACHE_DURATION_MS
-    ) {
-      setEthToUsdRate(ethPriceCache.value);
-      return;
-    }
-    try {
-      const response = await fetch(
-        "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
-      );
-      const data = await response.json();
-      if (data && data.ethereum && data.ethereum.usd) {
-        ethPriceCache.value = data.ethereum.usd;
-        ethPriceCache.timestamp = now;
-        setEthToUsdRate(data.ethereum.usd);
-      }
-    } catch (error) {
-      console.error("Failed to fetch ETH price:", error);
-      // Use fallback price if API fails
-      setEthToUsdRate(3000);
-    }
-  }, []);
+  // Removed user balance update - no longer needed without initial purchase
 
-  // Update user's ETH balance
-  const updateUserBalance = useCallback(async () => {
-    if (isConnected && address && publicClient) {
-      try {
-        const balance = await publicClient.getBalance({ address });
-        setUserEthBalance(balance);
-        console.log(
-          `User ETH balance: ${balance} wei (${Number(balance) / 10 ** 18} ETH)`
-        );
-      } catch (error) {
-        console.error("Failed to get user balance:", error);
-      }
-    }
-  }, [isConnected, address, publicClient]);
-
-  // Calculate purchase amount based on percentage of balance
-  const calculatePurchaseAmount = useCallback(
-    (percentage: number): string => {
-      if (userEthBalance === BigInt(0)) return "0.001";
-
-      // Calculate percentage of balance (leave some for gas)
-      const maxUsableBalance = (userEthBalance * BigInt(90)) / BigInt(100); // Use max 90% of balance to leave gas
-      const amount = (maxUsableBalance * BigInt(percentage)) / BigInt(100);
-
-      // Convert to ETH (with 5 decimal places)
-      const ethAmount = Number(amount) / 10 ** 18;
-
-      // Ensure minimum amount of 0.001 ETH
-      const finalAmount = Math.max(ethAmount, 0.001);
-
-      // Format to 5 decimal places max
-      return finalAmount.toFixed(5);
-    },
-    [userEthBalance]
-  );
-
-  // Set predefined amount with 1% slippage margin for 100%
-  const setPredefinedAmount = (percentage: number) => {
-    // If requesting 100%, actually use 99% to leave room for gas (1% slippage)
-    const actualPercentage = percentage === 100 ? 99 : percentage;
-    setSelectedPurchasePercentage(actualPercentage);
-    setIsCustomAmount(false);
-  };
-
-  // Handle custom amount change
-  const handleCustomAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setSelectedPurchaseAmount(value);
-    setIsCustomAmount(true);
-  };
+  // Removed purchase calculation functions - no longer supported in SDK v2
 
   // Add owner address
   const addOwnerAddress = () => {
@@ -345,29 +259,9 @@ export default function RetroCoinCreator() {
     setOwnersAddresses(ownersAddresses.filter((item) => item !== address));
   };
 
-  // Update purchase amount when slider changes, only if not in custom mode
-  useEffect(() => {
-    if (!isCustomAmount) {
-      const newAmount = calculatePurchaseAmount(selectedPurchasePercentage);
-      setSelectedPurchaseAmount(newAmount);
-    }
-  }, [selectedPurchasePercentage, calculatePurchaseAmount, isCustomAmount]);
+  // Removed purchase amount update effect - no longer supported in SDK v2
 
-  // Fetch ETH price and user balance
-  useEffect(() => {
-    fetchEthPrice();
-    updateUserBalance();
-
-    // Refresh price every 5 minutes
-    const priceInterval = setInterval(fetchEthPrice, 300000);
-
-    return () => clearInterval(priceInterval);
-  }, [fetchEthPrice, updateUserBalance]);
-
-  // Update balance when wallet connection changes
-  useEffect(() => {
-    updateUserBalance();
-  }, [isConnected, address, updateUserBalance]);
+  // Removed ETH price and balance effects - no longer needed without initial purchase
 
   // Generate AI suggestions for token name and description
   const generateAiSuggestions = useCallback(async () => {
@@ -866,39 +760,7 @@ export default function RetroCoinCreator() {
 
       console.log("Creating coin on Base network with address:", walletAddress);
 
-      // Skip balance check if purchase is disabled
-      if (isPurchaseEnabled) {
-        // Check user's balance before proceeding
-        const balance = await publicClient.getBalance({
-          address: walletAddress,
-        });
-        console.log(`Wallet balance: ${balance} wei`);
-
-        // Get user's selected purchase amount
-        const purchaseAmount = parseEther(selectedPurchaseAmount);
-        console.log(`User selected purchase amount: ${purchaseAmount} wei`);
-
-        // Minimum amount needed for the transaction (purchase amount + minimal gas buffer)
-        const gasBuffer = parseEther("0.00005"); // Reduced gas buffer to 0.00005 ETH
-        const minimumRequired = purchaseAmount + gasBuffer;
-
-        // Check if user has enough balance for transaction
-        if (balance < minimumRequired) {
-          setError(
-            `Insufficient funds. You need at least ${
-              Number(minimumRequired) / 10 ** 18
-            } ETH (${selectedPurchaseAmount} ETH + gas), but your wallet only has ${
-              Number(balance) / 10 ** 18
-            } ETH.`
-          );
-          toast.error("Not enough ETH in your wallet to create a coin", {
-            id: "status-toast",
-            duration: 4000,
-          });
-          setIsLoading(false);
-          return;
-        }
-      }
+      // Removed balance check for initial purchase - no longer supported in SDK v2
 
       // Show a loading toast for the creation process
       toast.loading("Creating your coin - this may take a moment...", {
@@ -910,7 +772,7 @@ export default function RetroCoinCreator() {
       console.log("Creating coin with URI:", formData.imageUrl);
       console.log(
         "Using currency:",
-        selectedCurrency === DeployCurrency.ZORA ? "ZORA" : "ETH"
+        selectedCurrency === CreateConstants.ContentCoinCurrencies.ZORA ? "ZORA" : "ETH"
       );
 
       const result = (await createZoraCoin(
@@ -923,10 +785,7 @@ export default function RetroCoinCreator() {
           chainId: chainId, // Include current chain ID
           platformReferrer: platformReferrer || undefined, // Optional platform referrer
           owners: ownersAddresses.length > 0 ? ownersAddresses : undefined,
-          // Use initial purchase as specified by user
-          initialPurchaseWei: isPurchaseEnabled
-            ? parseEther(selectedPurchaseAmount)
-            : BigInt(0),
+          // Removed initialPurchaseWei - no longer supported in SDK v2
         },
         walletClient,
         publicClient
@@ -979,7 +838,7 @@ export default function RetroCoinCreator() {
             creator_name: walletAddress, // You can enhance this with actual user names later
             tx_hash: result.hash,
             chain_id: chainId,
-            currency: selectedCurrency === DeployCurrency.ZORA ? "ZORA" : "ETH",
+            currency: selectedCurrency === CreateConstants.ContentCoinCurrencies.ZORA ? "ZORA" : "ETH",
             platform_referrer: platformReferrer || undefined,
           };
 
@@ -1051,8 +910,7 @@ export default function RetroCoinCreator() {
     setContractAddress,
     setSuccess,
     setStep,
-    selectedPurchaseAmount,
-    isPurchaseEnabled,
+    // Removed purchase dependencies - no longer supported in SDK v2
     ownersAddresses,
     aiSuggestion,
   ]);
@@ -1290,10 +1148,7 @@ export default function RetroCoinCreator() {
     }
   }, [autoCreateAfterConnect, isWalletReady]);
 
-  // Calculate USD value
-  const formattedUsdValue = (
-    parseFloat(selectedPurchaseAmount) * ethToUsdRate
-  ).toFixed(2);
+  // Removed USD value calculation - no longer needed without initial purchase
 
   // Open Basescan link
   const openBasescan = () => {
@@ -1321,12 +1176,9 @@ export default function RetroCoinCreator() {
     setContractAddress("");
     setDisplayImageUrl("");
     setAiSuggestion(null);
-    setSelectedPurchasePercentage(5);
-    setSelectedPurchaseAmount("0.005");
-    setIsCustomAmount(false);
-    setIsPurchaseEnabled(false);
+    // Removed purchase state resets - no longer supported in SDK v2
     setOwnersAddresses([]);
-    setSelectedCurrency(DeployCurrency.ZORA); // Reset to SDK default on Base
+    setSelectedCurrency(CreateConstants.ContentCoinCurrencies.ZORA); // Reset to SDK default on Base
     setPlatformReferrer(""); // Reset platform referrer
     // Mark random category as initialized to avoid override in effect
     randomCategoryInitialized.current = !!randomCategoryName;
@@ -1355,7 +1207,7 @@ export default function RetroCoinCreator() {
         .then((chainId) => {
           // Default to ETH on other chains
           const defaultCurrency =
-            chainId === base.id ? DeployCurrency.ZORA : DeployCurrency.ETH;
+            chainId === base.id ? CreateConstants.ContentCoinCurrencies.ZORA : CreateConstants.ContentCoinCurrencies.ETH;
           setSelectedCurrency(defaultCurrency);
         })
         .catch((error) => {
@@ -1479,11 +1331,11 @@ export default function RetroCoinCreator() {
   };
 
   // Currency change handler
-  const handleCurrencyChange = (currency: number) => {
+  const handleCurrencyChange = (currency: string) => {
     setSelectedCurrency(currency);
     console.log(
       `Currency changed to: ${
-        currency === DeployCurrency.ZORA ? "ZORA" : "ETH"
+        currency === CreateConstants.ContentCoinCurrencies.ZORA ? "ZORA" : "ETH"
       }`
     );
   };
@@ -1545,20 +1397,14 @@ export default function RetroCoinCreator() {
           description={formData.description}
           imageUrl={formData.imageUrl}
           displayImageUrl={displayImageUrl}
-          isPurchaseEnabled={isPurchaseEnabled}
-          selectedPurchaseAmount={selectedPurchaseAmount}
-          selectedPurchasePercentage={selectedPurchasePercentage}
-          usdValue={formattedUsdValue}
-          isCustomAmount={isCustomAmount}
+          // Removed purchase parameters - no longer supported in SDK v2
           ownersAddresses={ownersAddresses}
           newOwnerAddress={newOwnerAddress}
           isConnected={uiIsConnected}
           isLoading={isLoading}
           isWalletReady={isWalletReady}
           selectedCurrency={selectedCurrency}
-          onPurchaseToggle={() => setIsPurchaseEnabled(!isPurchaseEnabled)}
-          onPercentageChange={setPredefinedAmount}
-          onCustomAmountChange={handleCustomAmountChange}
+          // Removed purchase handlers - no longer supported in SDK v2
           onNewOwnerAddressChange={setNewOwnerAddress}
           onAddOwner={addOwnerAddress}
           onRemoveOwner={removeOwnerAddress}

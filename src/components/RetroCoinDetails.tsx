@@ -723,7 +723,6 @@ export default function CoinDetails({ coinAddress, onBack }: CoinDetailsProps) {
         coinAddress: tokenDetails.address,
         amountIn: tradeAmount,
         recipient: address,
-        referrer: "0xbFA6A45Dd534d39dF47A3F3D2f2b6E88416f9831",
         slippage: 0.05, // 5% slippage
         walletClient,
         publicClient,
