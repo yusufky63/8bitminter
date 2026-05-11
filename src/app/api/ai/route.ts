@@ -122,12 +122,8 @@ export async function POST(request: NextRequest) {
     const baseHeaders = { ...corsHeaders };
 
     // Get API key
-    const TOGETHER_API_KEY = process.env.NEXT_PUBLIC_TOGETHER_API_KEY;
-    console.log("API key exists:", !!TOGETHER_API_KEY);
-    console.log(
-      "API key first few chars:",
-      TOGETHER_API_KEY ? TOGETHER_API_KEY.substring(0, 3) + "..." : "null"
-    );
+    const TOGETHER_API_KEY = process.env.TOGETHER_API_KEY;
+    console.log("API key configured:", !!TOGETHER_API_KEY);
 
     if (!TOGETHER_API_KEY) {
       console.error("❌ Missing API key in environment variables");

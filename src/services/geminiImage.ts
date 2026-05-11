@@ -1,18 +1,18 @@
 import { GoogleGenAI } from '@google/genai';
 import mime from 'mime';
+import 'server-only';
 
 /**
  * Generate an image via Gemini SDK (stream) and return a data URL.
- * Falls back to the public NEXT_ key only if server key is absent.
  */
 export async function generateGeminiImageStream(
   name: string,
   symbol: string,
   description?: string,
   category?: string,
-  model: string = process.env.NEXT_PUBLIC_GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image',
+  model: string = process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image',
 ): Promise<string> {
-  const apiKey = process.env.GOOGLE_GEMINI_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_GEMINI_API_KEY;
+  const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
   if (!apiKey) throw new Error('Gemini API key not configured');
 
   const ai = new GoogleGenAI({ apiKey });

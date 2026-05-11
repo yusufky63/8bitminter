@@ -18,7 +18,7 @@ import {
   getMarketCapInfo,
   getTokenPrice,
 } from "../services/sdk/getOnchainData.js";
-import { analyzeTokenWithAI } from "../services/aiService";
+import { analyzeTokenWithAI } from "../services/tokenAnalysis";
 import { parseEther } from "viem";
 import { RetroButton } from "./ui/RetroButton";
 

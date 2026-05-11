@@ -1,5 +1,8 @@
+import "server-only";
+
 import { processTtlgenHerImage } from "./imageUtils";
 import { generateGeminiImageStream } from "./geminiImage";
+import { COIN_CATEGORIES } from "./coinCategories";
 
 // =============================================================================
 // CONSTANTS & CONFIGURATION
@@ -31,60 +34,6 @@ const MODELS = {
   },
 };
 
-// Updated coin categories to match the retro 8-bit theme
-const COIN_CATEGORIES = [
-  {
-    name: "8-Bit Gaming",
-    features: "Retro gaming, pixel characters, arcade experiences, game collectibles, nostalgia",
-    themes: "Arcade, classic games, pixel art, chiptune, high scores",
-  },
-  {
-    name: "Pixel Art Collectibles",
-    features: "Limited edition digital art, pixel collections, retro aesthetics, digital galleries",
-    themes: "Pixel art, color palettes, sprites, dithering, visual expression",
-  },
-  {
-    name: "CryptoVoxel Worlds",
-    features: "Virtual land, voxel buildings, metaverse events, digital avatars, retro environments",
-    themes: "Virtual worlds, voxels, digital landscapes, virtual real estate, community spaces",
-  },
-  {
-    name: "Retro Music & Chiptunes",
-    features: "Digital music ownership, chiptune collections, artist support, music events",
-    themes: "8-bit music, synthesizers, chiptunes, sound chips, nostalgic melodies",
-  },
-  {
-    name: "Arcade Economy",
-    features: "Play-to-earn, retro games tournaments, high score rewards, arcade economy",
-    themes: "Arcade tokens, leaderboards, game rewards, competition, community challenges",
-  },
-  {
-    name: "Digital Retro Fashion",
-    features: "Pixel wearables, retro-styled avatars, digital fashion items, nostalgic accessories",
-    themes: "80s/90s fashion, pixel clothing, digital accessories, avatar customization",
-  },
-  {
-    name: "8-Bit DeFi",
-    features: "Simplified finance, retro banking interfaces, pixel-styled investments, farming",
-    themes: "Financial pixels, retro banking, simplified economics, accessible finance",
-  },
-  {
-    name: "Retro Social Clubs",
-    features: "Community membership, retro chat rooms, digital hangouts, pixel avatars",
-    themes: "BBS nostalgia, pixel forums, digital clubhouses, community governance",
-  },
-  {
-    name: "Pixel Pets & Companions",
-    features: "Digital pets, creature training, pixel evolution, companion collection",
-    themes: "Tamagotchi-inspired, creature care, evolution, collecting, companions",
-  },
-  {
-    name: "Retro Tech & Gadgets",
-    features: "Digital gadget collections, retro hardware tributes, tech memorabilia",
-    themes: "Vintage computers, game consoles, pixel gadgets, tech nostalgia",
-  },
-];
-
 // =============================================================================
 // UTILITY FUNCTIONS
 // =============================================================================
@@ -93,11 +42,11 @@ const COIN_CATEGORIES = [
  * Get API key from environment variables
  */
 const getApiKey = () => {
-  const apiKey = process.env.NEXT_PUBLIC_TOGETHER_API_KEY;
+  const apiKey = process.env.TOGETHER_API_KEY;
   if (!apiKey) {
     console.error("Together API key is missing from environment variables");
     throw new Error(
-      "API key is required. Please set NEXT_PUBLIC_TOGETHER_API_KEY in your environment variables."
+      "API key is required. Please set TOGETHER_API_KEY in your server environment variables."
     );
   }
   return apiKey;
@@ -149,7 +98,7 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * Stability AI Image Generation
  */
 const generateImageWithStabilityAI = async (name, symbol, description) => {
-  const STABILITY_API_KEY = process.env.NEXT_PUBLIC_STABILITY_API_KEY;
+  const STABILITY_API_KEY = process.env.STABILITY_API_KEY;
   if (!STABILITY_API_KEY) {
     throw new Error("Stability AI API key not configured");
   }
@@ -205,7 +154,7 @@ const generateImageWithStabilityAI = async (name, symbol, description) => {
  * Replicate Image Generation
  */
 const generateImageWithReplicate = async (name, symbol, description) => {
-  const REPLICATE_API_KEY = process.env.NEXT_PUBLIC_REPLICATE_API_KEY;
+  const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
   if (!REPLICATE_API_KEY) {
     throw new Error("Replicate API key not configured");
   }
@@ -775,7 +724,7 @@ export { retryOperation };
  * Gemini Imagen 3 (Fast) Image Generation
  */
 const generateImageWithGemini = async (name, symbol, description, categoryContext) => {
-  const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_GEMINI_API_KEY;
+  const GEMINI_API_KEY = process.env.GOOGLE_GEMINI_API_KEY;
   if (!GEMINI_API_KEY) {
     throw new Error("Gemini API key not configured");
   }

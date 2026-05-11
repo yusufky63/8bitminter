@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const TOGETHER_API_KEY = process.env.NEXT_PUBLIC_TOGETHER_API_KEY;
+const TOGETHER_API_KEY = process.env.TOGETHER_API_KEY;
 // Rate limiting variables
 const MAX_RETRIES = 3;
 const BASE_DELAY = 2000; // 2 seconds base delay
@@ -33,6 +33,13 @@ interface TextCompletionParams {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!TOGETHER_API_KEY) {
+      return NextResponse.json(
+        { error: 'Together API key is not configured' },
+        { status: 500 }
+      );
+    }
+
     const body = await request.json();
     
     // Check if it's an image generation request based on body parameters

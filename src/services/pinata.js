@@ -1,7 +1,8 @@
 import axios from 'axios';
+import 'server-only';
 
 // Pinata API anahtarı
-const PINATA_JWT = process.env.NEXT_PUBLIC_PINATA_JWT;
+const PINATA_JWT = process.env.PINATA_JWT;
 
 // Güvenilir IPFS Gateway'leri - ipfs.io'yu öncelikten düşürdük çünkü zaman aşımı yaşanıyor
 const IPFS_GATEWAYS = [

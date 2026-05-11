@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const REPLICATE_API_KEY = process.env.NEXT_PUBLIC_REPLICATE_API_KEY;
+const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
 const REPLICATE_API_BASE_URL = 'https://api.replicate.com/v1/predictions';
 
 export async function POST(request: NextRequest) {

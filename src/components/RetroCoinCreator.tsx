@@ -29,7 +29,7 @@ import { RetroSuccess } from "./RetroSuccess";
 import { RetroNotification } from "./RetroNotification";
 
 // Services
-import { getCoinCategories } from "../services/aiService.js";
+import { getCoinCategories } from "../services/coinCategories.js";
 // Moved IPFS pinning to server route to avoid CORS with Together links
 import {
   createZoraCoin,
