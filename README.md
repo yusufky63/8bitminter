@@ -1,28 +1,41 @@
 # 8bitMinter
 
-![Category](https://img.shields.io/badge/Category-Farcaster%20Mini%20App%20%2F%20Token%20Creator-1f1f1f?style=flat-square&labelColor=141414&color=2b2b2b) ![Status](https://img.shields.io/badge/Status-public-1f1f1f?style=flat-square&labelColor=141414&color=2b2b2b)
+8bitMinter is a retro-styled token creator for Farcaster and Base. It uses AI-assisted content, Zora SDK flows, and a mobile-first minting experience.
 
-Retro-styled token creator for Farcaster and Base with AI-assisted content and Zora SDK flows.
+## Snapshot
 
-## Links
+- **Category:** Retro Farcaster token creator
+- **Status:** Public repository
+- **Live:** https://8bitminter.vercel.app
+- **Repository:** https://github.com/yusufky63/8bitminter
+- **Portfolio:** https://codexsha.dev
 
-- Live: https://8bitminter.vercel.app
-- Repository: https://github.com/yusufky63/8bitminter
-- Portfolio: https://codexsha.dev
+## Product Scope
 
-## Overview
+8bitMinter is documented here as a product repository, not just a code dump. The goal of this README is to make the product purpose, runtime surface, and development path clear for future review and maintenance.
 
-8bitMinter is part of the Codexsha product portfolio. The project is focused on shipping a compact, usable product surface rather than a demo-only prototype. This README is written to make the repository easier to understand, run, and evaluate.
-
-## Key Features
+## Core Capabilities
 
 - Retro token creation interface
-- AI-assisted token content and visuals
+- AI-assisted token copy and visual generation
 - Zora coin creation flow
 - Farcaster-ready mobile UX
-- Wallet integration for Base flows
+- Supabase/Redis-backed product flow where enabled
 
-## Stack
+## Existing README Coverage Preserved
+
+This refresh keeps the important project-specific areas from the previous documentation:
+
+- What it does
+- The problem it solves
+- Challenges I ran into
+- Technologies I used
+- How we built it
+- What we learned
+- What's next
+- App Pages & Features
+
+## Tech Stack
 
 - Next.js
 - TypeScript
@@ -35,34 +48,39 @@ Retro-styled token creator for Farcaster and Base with AI-assisted content and Z
 - Wagmi
 - Viem
 
-## Role / Ownership
+## Repository Map
 
-Built token creation UX, AI-assisted generation flow, Web3 integration, and deploy pipeline.
+| Path | Purpose |
+| --- | --- |
+| src/app/ | App routes and mini app pages |
+| src/components/ | Creation and wallet UI |
+| src/lib/ | AI, Web3, and persistence helpers |
+| public/ | Logo, splash, and preview assets |
 
-## Getting Started
+## Local Development
 
-```bash
-npm install
-npm run dev
-npm run build
-```
+| Command | Purpose |
+| --- | --- |
+| npm run dev | Run development server |
+| npm run build | Build production app |
+| npm run start | Start production server |
+| npm run lint | Run lint checks |
 
-## Environment
+## Environment Notes
 
-Create a local environment file from the project conventions and configure only the values needed for the flow you are running. Do not commit secrets.
+Use local environment files for secrets and deployment-specific values. Do not commit real keys.
 
-Typical values used by this project include:
-
-- Farcaster credentials
+- Farcaster app credentials
 - Zora/WalletConnect configuration
 - AI provider keys
-- Supabase and Redis credentials
+- Supabase credentials
+- Upstash Redis credentials
 
-## Project Notes
+## Operational Notes
 
-- Status: Public repository and live deployment.
-- Private or sensitive implementation details are intentionally not documented in public-facing copy.
-- The README should stay aligned with the live product and the Codexsha portfolio page.
+- Keep this README aligned with the live product and portfolio copy.
+- Prefer small, documented changes over large undocumented rewrites.
+- The older README mixed hackathon-style story sections with implementation notes. This version keeps the useful story but makes the repo easier to scan.
 
 ## Maintainer
 
